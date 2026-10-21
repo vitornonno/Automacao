@@ -1,0 +1,168 @@
+/* global chrome */
+(function pricingModule(global) {
+  'use strict';
+
+  const SIZE_BANDS = [800, 1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400, 2600, 2800, 3000];
+  const SERVICES = {
+    deep_cleaning: 'Deep Cleaning',
+    first_cleaning: 'First Cleaning',
+    move_in: 'Move-in Cleaning',
+    move_out: 'Move-out Cleaning',
+    monthly: 'Monthly Cleaning',
+    biweekly: 'Bi-weekly Cleaning',
+    post_construction: 'Post-Construction Cleaning',
+    move_in_out: 'Move-In / Move-Out Cleaning'
+  };
+
+  const KACS_HOURS = {
+    800: [2, 2, 2.5, 3, 1.5, 1.5, 3],
+    1000: [2.5, 2, 3, 3.5, 2, 1.5, 3.5],
+    1200: [3, 2.5, 3.5, 4, 2, 1.5, 4],
+    1400: [3.5, 3, 4, 4.5, 2.5, 2, 5],
+    1600: [4.5, 3.5, 5, 5.5, 2.5, 2.5, 5.5],
+    1800: [5, 4, 5.5, 6, 3, 2.5, 6.5],
+    2000: [5.5, 4, 6, 7, 3.5, 3, 7],
+    2200: [6, 4.5, 7, 7.5, 3.5, 3, 7.5],
+    2400: [6.5, 5, 7.5, 8.5, 4, 3.5, 8.5],
+    2600: [7.5, 5.5, 8, 9, 4.5, 4, 9],
+    2800: [8, 6, 9, 10, 4.5, 4, 10],
+    3000: [8.5, 6.5, 9.5, 10.5, 5, 4.5, 10.5]
+  };
+
+  const BEGINNER_PRICES = {
+    800: [165, 150, 185, 205, 120, 110, 250],
+    1000: [195, 165, 220, 245, 130, 115, 300],
+    1200: [225, 190, 250, 280, 140, 130, 360],
+    1400: [270, 215, 305, 340, 170, 145, 420],
+    1600: [325, 250, 365, 410, 195, 170, 480],
+    1800: [370, 280, 410, 460, 220, 190, 540],
+    2000: [410, 310, 460, 520, 250, 215, 600],
+    2200: [460, 345, 510, 570, 275, 235, 660],
+    2400: [495, 375, 560, 625, 300, 260, 720],
+    2600: [550, 410, 610, 680, 325, 280, 780],
+    2800: [595, 440, 660, 735, 350, 300, 840],
+    3000: [640, 475, 710, 790, 375, 320, 900]
+  };
+
+  const SERVICE_INDEX = Object.keys(SERVICES);
+    const INITIAL_LEAD_SERVICE_IDS = ['deep_cleaning', 'first_cleaning', 'move_in_out', 'post_construction'];
+  const BED_BATH_TO_BAND = {
+    '1|1': 800, '2|1': 1000, '2|2': 1200, '3|2': 1600,
+    // No exact 3-bedroom/3-bathroom row exists; use the conservative viable 1,600 sq. ft. band.
+    '3|3': 1600,
+    '2|2.5': 1800, '4|2.5': 2000, '4|3': 2400, '4|4': 3000, '5|3.5': 2600, '5|4': 3000
+  };
+
+  function normalizeService(value) {
+    if (!value) return null;
+    const text = String(value).toLowerCase().replace(/[–—]/g, '-').replace(/\s+/g, ' ').trim();
+      if (/move[ -]?in\s*(?:or|\/)\s*move[ -]?out/.test(text)) return 'move_in_out';
+    const aliases = [
+      ['post_construction', /post[ -]?construction|construction clean/],
+      ['move_in', /move[ -]?in/],
+      ['move_out', /move[ -]?out/],
+      ['deep_cleaning', /deep clean/],
+      ['first_cleaning', /first clean|initial clean/],
+      ['biweekly', /bi[ -]?weekly|every two weeks/],
+      ['monthly', /monthly|once a month/]
+    ];
+    const matched = aliases.find(([, pattern]) => pattern.test(text));
+    return matched ? matched[0] : null;
+  }
+
+  function resolveService(value, frequency) {
+    const directMatch = normalizeService(value);
+      if (directMatch) return ['move_in', 'move_out'].includes(directMatch) ? 'move_in_out' : directMatch;
+    const serviceText = String(value || '').toLowerCase();
+    if (!/regular|standard|home cleaning/.test(serviceText)) return null;
+    // New leads always begin with a First Cleaning; recurring rates apply later.
+    return 'first_cleaning';
+  }
+
+  function normalizeNumber(value) {
+    if (value === null || value === undefined || value === '') return null;
+    const number = Number(String(value).replace(/,/g, '').match(/\d+(?:\.\d+)?/)?.[0]);
+    return Number.isFinite(number) ? number : null;
+  }
+
+  function chooseSizeBand(lead) {
+    const squareFeet = normalizeNumber(lead.squareFeet);
+    if (squareFeet) {
+      if (squareFeet > 3000) return { status: 'over_limit', squareFeet };
+      return { status: 'resolved', band: SIZE_BANDS.find((band) => squareFeet <= band), source: 'square_feet', squareFeet };
+    }
+    const bedrooms = normalizeNumber(lead.bedrooms);
+    const bathrooms = normalizeNumber(lead.bathrooms);
+    if (bedrooms && bathrooms) {
+      const band = BED_BATH_TO_BAND[`${bedrooms}|${bathrooms}`];
+      if (band) return { status: 'resolved', band, source: 'bedrooms_bathrooms', bedrooms, bathrooms };
+    }
+    return { status: 'missing_size' };
+  }
+
+  function resolveCompany(companyName, override) {
+    if (override === 'kacs' || override === 'jheys') return override;
+    if (/\bkacs\b|kacs cleaning services/i.test(companyName || '')) return 'kacs';
+    if (/jhey['’]?s cleaning/i.test(companyName || '')) return 'jheys';
+    return 'unknown';
+  }
+
+  function calculateQuote(lead, options = {}) {
+    const company = resolveCompany(lead.companyName, options.companyOverride || lead.companyOverride);
+    const service = resolveService(lead.serviceType, lead.frequency);
+    const size = chooseSizeBand(lead);
+    const base = {
+      company,
+      service,
+      serviceLabel: service ? SERVICES[service] : null,
+      size,
+      status: 'needs_review',
+      requiresHumanApproval: true,
+      lead: { ...lead }
+    };
+
+    if (!service) return { ...base, status: 'missing_service', reason: 'No supported cleaning type was found.' };
+    if (company === 'unknown') return { ...base, status: 'manual_company_required', reason: 'Select KACS or Jhey\'s Cleaning before calculating.' };
+    if (size.status === 'missing_size') return { ...base, status: 'missing_size', reason: 'No usable square footage or bedroom/bathroom match was found.' };
+
+    if (company === 'kacs') {
+      if (size.status === 'over_limit') {
+        return { ...base, status: 'manual_hours_required', hourlyRate: 100, reason: 'Homes above 3,000 sq. ft. require a human time estimate.' };
+      }
+        const moveInOut = service === 'move_in_out';
+        const baseHours = moveInOut
+          ? (KACS_HOURS[size.band][SERVICE_INDEX.indexOf('move_in')] + KACS_HOURS[size.band][SERVICE_INDEX.indexOf('move_out')]) / 2
+          : KACS_HOURS[size.band][SERVICE_INDEX.indexOf(service)];
+      return {
+        ...base,
+        quoteType: 'time_only',
+        hourlyRate: 100,
+        baseHours,
+        toleranceHours: 1.5,
+        estimatedHours: { minimum: baseHours, maximum: baseHours + 1.5 },
+        pricingDisclosure: 'hourly_recommended',
+        status: 'ready_for_review'
+      };
+    }
+
+    if (size.status === 'over_limit') return { ...base, status: 'manual_quote_required', reason: 'Homes above 3,000 sq. ft. require a human quote.' };
+      const moveInOut = service === 'move_in_out';
+      const amount = moveInOut
+        ? Math.round((BEGINNER_PRICES[size.band][SERVICE_INDEX.indexOf('move_in')] + BEGINNER_PRICES[size.band][SERVICE_INDEX.indexOf('move_out')]) / 2)
+        : BEGINNER_PRICES[size.band][SERVICE_INDEX.indexOf(service)];
+      return {
+      ...base,
+      quoteType: 'fixed_price',
+        amount,
+      priceRange: {
+          minimum: amount,
+          maximum: amount + 100
+      },
+      currency: 'USD',
+      status: 'ready_for_review'
+    };
+  }
+
+  global.CleaningQuoteEngine = { calculateQuote, chooseSizeBand, normalizeService, resolveService, resolveCompany, SERVICES, SIZE_BANDS, INITIAL_LEAD_SERVICE_IDS };
+  if (typeof module !== 'undefined') module.exports = global.CleaningQuoteEngine;
+})(typeof globalThis !== 'undefined' ? globalThis : window);

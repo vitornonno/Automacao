@@ -1,0 +1,23 @@
+# Sensitive local material: retained locally, never committed
+prints/
+memory/
+docs/codigo_fonte_*.txt
+docs/pagina_individual_leadsYelp.txt
+docs/Base VA - KACS Cleaning.txt
+docs/Base VA - Jhey's Cleaning.txt
+docs/guia_precificacao.xlsx
+docs/guia_precificacao_horas.xlsx
+docs/~$*
+
+# Credentials, local configuration, and provider caches
+*.env
+*.env.*
+!*.env.example
+*-secrets.txt
+route-relay/.wrangler/
+
+# Dependencies and local tooling
+node_modules/
+coverage/
+.DS_Store
+Thumbs.db

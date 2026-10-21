@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Approval queue</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main>
+      <header><h1>Approval queue</h1><button id="refresh" title="Refresh">↻</button></header>
+      <nav aria-label="Review filters">
+        <button class="filter active" data-filter="pending_human_approval">Pending</button>
+        <button class="filter" data-filter="all">All</button>
+      </nav>
+      <p id="summary"></p>
+      <section id="reviews" aria-live="polite"></section>
+      <details class="presto-settings">
+        <summary>Presto schedule</summary>
+        <p>Read-only. Open the correct company calendar in Presto; the extension identifies the company automatically.</p>
+        <div><button id="scan-presto" type="button">Read visible schedule</button></div>
+        <small id="presto-status" aria-live="polite"></small>
+        <details class="presto-debug"><summary>Verbose debug</summary><button id="copy-presto-debug" class="quiet" type="button">Copy debug</button><pre id="presto-debug-output">No Presto scan yet.</pre></details>
+      </details>
+      <details class="route-settings">
+        <summary>Route relay</summary>
+        <p>Stores only the relay URL and extension token locally. Your Mapbox token remains in Cloudflare.</p>
+        <label>Relay URL<input id="relay-url" type="url" placeholder="https://…workers.dev"></label>
+        <label>Extension token<input id="relay-token" type="password" autocomplete="off"></label>
+        <div><button id="save-relay" type="button">Save</button><button id="test-relay" class="quiet" type="button">Test routes</button></div>
+        <small id="relay-status" aria-live="polite"></small>
+      </details>
+    </main>
+    <script src="quote-messages.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>
