@@ -63,6 +63,7 @@ Quando os valores do estado Apollo divergirem das respostas atuais visíveis no 
 - Informar que a equipe fará uma rápida walkthrough na chegada para confirmar o escopo e o valor final antes de começar.
 - Para dados de tamanho faltantes, solicitar metragem, quartos/banheiros e, opcionalmente, fotos ou vídeo.
 - As mensagens seguem `docs/Base VA - Jhey's Cleaning.txt`. Não inventar duração estimada: a tabela disponível contém preços, não tempos.
+- As mensagens de primeira resposta da Jhey’s usam tom acolhedor e promocional para novos clientes, destacando cuidado personalizado e valor do serviço. A faixa exibida já incorpora o preço introdutório para novos clientes; não informar percentual ou preço anterior que não esteja definido. Não devem inventar vagas, duração ou promessas de resultado.
 
 ## Limitações de serviço nas mensagens de cotação
 
@@ -87,6 +88,7 @@ Ao reabrir uma lead salva/aprovada/ajustada, não criar uma duplicata. O botão 
 - Se novos detalhes de produtos ou serviços adicionais estiverem mais completos do que o registro salvo, a extensão permite gerar uma versão corrigida.
 - Mudanças em metragem, quartos ou banheiros também permitem recalcular e confirmar uma versão atualizada.
 - Quando uma cotação já aprovada for alterada manualmente no painel (empresa, serviço, metragem, quartos ou banheiros), a extensão recalcula e atualiza imediatamente o registro e a mensagem da área de transferência. Como a duração pode mudar, quaisquer datas de disponibilidade anteriores são removidas até uma nova busca ser executada. Marcar ou desmarcar uma data compatível também atualiza a mensagem copiada.
+- Para leads já aprovadas/ajustadas, os botões **Copy follow-up 1**, **2**, **3** e **4** leem o texto visível da conversa atual do Yelp e reconhecem individualmente os trechos característicos de cada modelo da empresa. Um modelo que já aparece na conversa fica bloqueado, mas não há sequência obrigatória: a pessoa escolhe o follow-up adequado à situação. Os botões apenas copiam; não enviam nem alteram o chat.
 
 ## Dados locais e privacidade
 

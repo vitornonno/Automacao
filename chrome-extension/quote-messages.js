@@ -67,6 +67,119 @@
     );
     return details;
   }
+  const followUpDefinitions = {
+    kacs: [
+      {
+        signature: "i tried giving you a quick call to follow up in case you're still looking for help with your home cleaning",
+        message: (name) => [
+          `Hi ${name}, this is Frank just checking in!`,
+          '',
+          "I tried giving you a quick call to follow up in case you're still looking for help with your home cleaning.",
+          '',
+          'At KACS Cleaning, we specialize in making your life easier — delivering a spotless home without you lifting a finger.',
+          'Our cleanings are fully customized to your priorities, so you get exactly what you need, effortlessly.',
+          '',
+          'Looking forward to your reply!'
+        ].join('\n')
+      },
+      {
+        signature: "i noticed you saw our last message and wanted to follow up in case you're still looking for help with your home cleaning",
+        message: (name) => [
+          `Hi ${name}, this is Frank from KACS Cleaning again, just checking in!`,
+          '',
+          "I noticed you saw our last message and wanted to follow up in case you're still looking for help with your home cleaning.",
+          '',
+          'Let me know if you have any questions or special requests, we’d love to provide a personalized quote that fits exactly what you’re looking for.'
+        ].join('\n')
+      },
+      {
+        signature: "checking in to follow up on the cleaning service quote we've shared with you",
+        message: (name) => [
+          `Hi ${name}, this is Frank! I hope everything is okay!`,
+          '',
+          "I'm just checking in to follow up on the cleaning service quote we've shared with you.",
+          '',
+          'Let me know if you need more time, something not included in the checklist, or if you have any questions. Also, if you could let me know your budget, we can try to work within that.',
+          '',
+          'Feel free to contact me if you have any questions or would like to discuss adjustments.'
+        ].join('\n')
+      },
+      {
+        signature: "i wanted to check in to see if you're still interested in scheduling a home cleaning",
+        message: (name) => [
+          `Hi ${name}, this is Frank from KACS Cleaning Services -- just reaching out again!`,
+          '',
+          "I wanted to check in to see if you're still interested in scheduling a home cleaning. Our goal is to make things simple for you, with a sparkling clean home tailored exactly to your needs.",
+          '',
+          "Please feel free to share any details or questions -- we'd be glad to prepare a personalized quote that works perfectly for you."
+        ].join('\n')
+      }
+    ],
+    jheys: [
+      {
+        signature: 'whether you are still considering options for your home cleaning',
+        message: (name) => [
+          `Hi ${name}, this is Jhey’s Cleaning following up.`,
+          '',
+          'I wanted to check whether you are still considering options for your home cleaning.',
+          '',
+          'At Jhey’s Cleaning, our aim is to make the process simple and worry-free, with each service tailored to your home’s specific needs.',
+          '',
+          'Please let me know your thoughts whenever convenient.',
+          '',
+          'Best regards,',
+          'Jhey’s Cleaning'
+        ].join('\n')
+      },
+      {
+        signature: 'follow up in case this message was previously overlooked',
+        message: (name) => [
+          `Hi ${name}, this is Jhey’s Cleaning once again.`,
+          '',
+          'I wanted to follow up in case this message was previously overlooked. There is no pressure at all — I simply wanted to remain available should you still be deciding.',
+          '',
+          'If any part of the estimate needs adjustment, I would be glad to review it with you.',
+          '',
+          'Best regards,',
+          'Jhey’s Cleaning'
+        ].join('\n')
+      },
+      {
+        signature: 'follow up once more regarding the estimate we shared with you',
+        message: (name) => [
+          `Hi ${name}, this is Jhey’s Cleaning.`,
+          '',
+          'I wanted to follow up once more regarding the estimate we shared with you. I understand if timing may not be right just yet.',
+          '',
+          'If there is a specific budget you are working with, or an item in the checklist you would prefer to adjust, please let me know and we can review the options together.',
+          '',
+          'I remain available whenever you are ready to proceed or if you have any questions.',
+          '',
+          'Best regards,',
+          'Jhey’s Cleaning'
+        ].join('\n')
+      },
+      {
+        signature: "i wanted to check in to see if you're still interested in scheduling a home cleaning",
+        message: (name) => [
+          `Hi ${name}, this is Frank from Jhey's Cleaning -- just reaching out again!`,
+          '',
+          "I wanted to check in to see if you're still interested in scheduling a home cleaning. Our goal is to make things simple for you, with a sparkling clean home tailored exactly to your needs.",
+          '',
+          "Please feel free to share any details or questions -- we'd be glad to prepare a personalized quote that works perfectly for you."
+        ].join('\n')
+      }
+    ]
+  };
+  function followUpStatus(company, lead, conversationText) {
+    const followUps = followUpDefinitions[company] || [];
+    const history = String(conversationText || '').toLocaleLowerCase();
+    return followUps.map((followUp, index) => ({
+      number: index + 1,
+      sent: history.includes(followUp.signature),
+      message: followUp.message(lead?.customerName || 'there')
+    }));
+  }
   function kacsMessage(review) {
     const quote = review.quote;
     const lead = review.lead || {};
@@ -123,6 +236,8 @@
       '',
       'Thank you for reaching out to Jhey’s Cleaning. 👋',
       '',
+      '✨ We’re currently welcoming new clients and would love the opportunity to prepare a personalized cleaning plan for your home.',
+      '',
       'To prepare an accurate estimate for your home, could you kindly share the following details?',
       '• Approximate square footage',
       '• Number of bedrooms and bathrooms',
@@ -142,13 +257,18 @@
     const message = [
       greeting(lead.customerName),
       '',
-      'Thank you for the information provided. Based on the details of your home, we recommend the following:'
+      'Thank you for reaching out to Jhey’s Cleaning! ✨',
+      '',
+      'We’re currently welcoming new clients and would love the opportunity to make your home feel fresh, comfortable, and sparkling clean.',
+      '',
+      'Based on the details of your home, we recommend the following:'
     ];
     if (details.length) message.push('', ...details);
     message.push(
       '',
       `🧼 Recommended service: ${quote.serviceLabel || 'Cleaning'}`,
-      `💲 Estimated investment: $${quote.priceRange?.minimum ?? quote.amount} to $${quote.priceRange?.maximum ?? Number(quote.amount || 0) + 100}`
+      `💲 Estimated investment: $${quote.priceRange?.minimum ?? quote.amount} to $${quote.priceRange?.maximum ?? Number(quote.amount || 0) + 100}`,
+      '✨ Introductory pricing for new clients'
     );
     if (quote.service === 'move_in_out') message.push('', 'To make this estimate more accurate and fair, could you please confirm whether the service is for a move-in or move-out?');
     const limitations = serviceLimitations(lead);
@@ -163,7 +283,7 @@
       'Upon arrival, our team will complete a quick walkthrough to confirm the scope of work and final price before beginning.',
       ...(noAvailabilityFollowUp(review).length ? ['', ...noAvailabilityFollowUp(review)] : []),
       '',
-      'Please let us know if you would like to proceed or have any questions.',
+      'We would be delighted to welcome you to Jhey’s Cleaning. Please let us know if you would like to proceed or have any questions.',
       '',
       'Best regards,',
       'Jhey’s Cleaning',
@@ -183,6 +303,6 @@
     return 'This lead needs a manual review before a message can be prepared.';
   }
 
-  global.CleaningQuoteMessages = { approvedMessage };
+  global.CleaningQuoteMessages = { approvedMessage, followUpStatus };
   if (typeof module !== 'undefined') module.exports = global.CleaningQuoteMessages;
 })(globalThis);

@@ -324,6 +324,15 @@
       .map(([id, label]) => `<option value="${id}" ${id === current ? 'selected' : ''}>${label}</option>`).join('');
     return `<label>Cleaning type<select data-field="serviceType"><option value="">Select cleaning type</option>${options}</select></label>`;
   }
+  function conversationText() {
+    const conversation = document.querySelector('main') || document.body;
+    return conversation?.innerText || '';
+  }
+  function followUpButtons() {
+    if (!canCopyApprovedMessage()) return '<button disabled>Copy follow-up</button>';
+    const followUps = CleaningQuoteMessages.followUpStatus(quote.company, lead, conversationText());
+    return followUps.map((followUp) => `<button data-action="copy-follow-up" data-follow-up-number="${followUp.number}" ${followUp.sent ? 'disabled' : ''}>${followUp.sent ? `Follow-up ${followUp.number} sent` : `Copy follow-up ${followUp.number}`}</button>`).join('');
+  }
   function render() {
     if (queueMode) { renderQueue(); return; }
     const saveLabel = blocksSaveForApproval()
@@ -354,7 +363,7 @@
         ${input('Bathrooms', lead.bathrooms, 'bathrooms', 'number')}
       </section>
       <section class="result"><p>${displayQuote(quote)}</p><dl><div><dt>Size band</dt><dd>${quote.size.band ? `up to ${quote.size.band} sq. ft.` : 'Not resolved'}</dd></div><div><dt>Source</dt><dd>${quote.size.source || 'Manual review'}</dd></div><div><dt>Status</dt><dd>${quote.status.replaceAll('_', ' ')}</dd></div></dl></section>
-        ${availabilityMarkup()}${confirmationFeedback ? `<p class="existing-review">${escapeHtml(confirmationFeedback)}</p>` : ''}${reviewMessage}<footer><button data-action="copy-approved" ${canCopyApprovedMessage() ? '' : 'disabled'}>${copyLabel}</button><button data-action="availability" ${quote.status !== 'ready_for_review' ? 'disabled' : ''}>Find availability</button><button data-action="save" ${!canSaveForApproval(quote) || blocksSaveForApproval() ? 'disabled' : ''}>${saveLabel}</button></footer>${debugMarkup()}`;
+        ${availabilityMarkup()}${confirmationFeedback ? `<p class="existing-review">${escapeHtml(confirmationFeedback)}</p>` : ''}${reviewMessage}<footer><button data-action="copy-approved" ${canCopyApprovedMessage() ? '' : 'disabled'}>${copyLabel}</button>${followUpButtons()}<button data-action="availability" ${quote.status !== 'ready_for_review' ? 'disabled' : ''}>Find availability</button><button data-action="save" ${!canSaveForApproval(quote) || blocksSaveForApproval() ? 'disabled' : ''}>${saveLabel}</button></footer>${debugMarkup()}`;
   }
   async function renderQueue() {
     const records = await chrome.storage.local.get(null);
@@ -455,6 +464,21 @@
         confirmationFeedback = 'Approved message copied to clipboard.';
       } catch {
         confirmationFeedback = 'Could not copy the approved message.';
+      }
+      render();
+    }
+    if (action === 'copy-follow-up' && canCopyApprovedMessage()) {
+      const number = Number(event.target.dataset.followUpNumber);
+      const followUp = CleaningQuoteMessages.followUpStatus(quote.company, lead, conversationText()).find((item) => item.number === number);
+      if (!followUp || followUp.sent) {
+        confirmationFeedback = 'This follow-up already appears in this Yelp conversation.';
+        logDebug('Follow-up not copied', { company: quote.company, number, reason: 'already_detected' });
+      } else try {
+        await navigator.clipboard.writeText(followUp.message);
+        confirmationFeedback = `Follow-up ${followUp.number} copied to clipboard. Review it, then paste it into Yelp when ready.`;
+        logDebug('Follow-up copied', { company: quote.company, number: followUp.number });
+      } catch {
+        confirmationFeedback = 'Could not copy the follow-up.';
       }
       render();
     }
