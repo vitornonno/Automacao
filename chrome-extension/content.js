@@ -1,4 +1,4 @@
-/* global CleaningLeadExtractor, CleaningQuoteEngine, chrome */
+/* global CleaningLeadExtractor, CleaningQuoteEngine, CleaningCleanerAvailability, chrome */
 (function contentModule() {
   'use strict';
 
@@ -178,7 +178,8 @@
   async function findAvailability() {
     availability = { status: 'loading' }; render();
     try {
-      const saved = await chrome.storage.local.get(`prestoJobs:${quote.company}`);
+      const availabilityStorageKey = CleaningCleanerAvailability.storageKey(quote.company);
+      const saved = await chrome.storage.local.get([`prestoJobs:${quote.company}`, availabilityStorageKey]);
       const snapshot = saved[`prestoJobs:${quote.company}`];
       if (!snapshot?.jobs?.length) throw new Error('Read this company’s Presto schedule first.');
       if (!lead.location) throw new Error('Lead location is unavailable.');
@@ -187,6 +188,7 @@
         const destination = geocode.location; const duration = quoteDurationMinutes();
         if (!Number.isFinite(duration) || duration <= 0) throw new Error('A service duration or usable price is required to calculate availability.');
       const grouped = Object.groupBy(snapshot.jobs, (job) => job.date);
+      const importedAvailability = saved[availabilityStorageKey];
       const cleaners = [...new Set(snapshot.jobs.flatMap((job) => Array.isArray(job.cleaners) ? job.cleaners : []).filter(Boolean))];
       // KACS availability is intentionally based on Rafael's route only. Other
       // teams can be working at the same time without consuming Rafael's slot.
@@ -199,12 +201,14 @@
             availabilityDebug.push({ day, result: 'unavailable', reason: 'Sunday — service is not offered.' });
             continue;
           }
+          const importedSlots = CleaningCleanerAvailability.importedSlots(importedAvailability, day, duration);
+          options.push(...importedSlots);
           const dayJobs = grouped[day] || [];
           const scheduledJobs = quote.company === 'kacs'
             ? dayJobs.filter((job) => Array.isArray(job.cleaners) && job.cleaners.includes('Rafael'))
             : dayJobs;
           if (scheduledJobs.some((job) => !job.coordinates || !Number.isFinite(job.price) || job.price <= 0 || !Array.isArray(job.cleaners) || !job.cleaners.length)) {
-            unavailableDays.push(day);
+            if (!importedSlots.length) unavailableDays.push(day);
             availabilityDebug.push({ day, result: 'unavailable', reason: 'A Rafael job is missing a location, price, or cleaner assignment.' });
             continue;
           }
@@ -251,8 +255,9 @@
               availabilityDebug.push({ day, result: 'rejected', start, previousJob: previous?.customerName || null, nextJob: next?.customerName || null, routeBefore, routeAfter, reason: 'Service would end after 7:00 PM.' });
             }
         }
-          const first = candidates.sort((a, b) => a.start - b.start)[0]; if (first === undefined) unavailableDays.push(day); else options.push({ day, ...first });
+          const first = candidates.sort((a, b) => a.start - b.start)[0]; if (first === undefined) { if (!importedSlots.length) unavailableDays.push(day); } else options.push({ day, ...first });
       }
+        options.sort((left, right) => left.day.localeCompare(right.day) || left.start - right.start || String(left.cleaner).localeCompare(String(right.cleaner)));
         const displayedOptions = options.slice(0, 3);
         const hiddenCompatibleOptions = options.slice(3);
         availability = { status: 'ready', approximateLocation: geocode.location.label, duration, options: displayedOptions, compatibleTotal: options.length, hiddenCompatibleOptions, unavailableDays, calculation: availabilityDebug };
@@ -276,7 +281,7 @@
   function availabilityDay(date) {
     return new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric' }).format(new Date(`${date}T12:00:00`));
   }
-  function availabilityKey(item) { return `${item.day}|${item.start}`; }
+  function availabilityKey(item) { return `${item.day}|${item.start}|${item.cleaner || 'rafael'}`; }
   function allAvailabilityOptions() {
     if (availability?.status !== 'ready') return [];
     return [...(availability.options || []), ...(availability.hiddenCompatibleOptions || [])];

@@ -1,4 +1,4 @@
-/* global chrome */
+/* global chrome, CleaningXlsxImporter, CleaningCleanerAvailability */
 'use strict';
 
 const reviewsElement = document.querySelector('#reviews');
@@ -204,6 +204,57 @@ document.querySelector('#copy-presto-debug').addEventListener('click', async () 
   }
 });
 
+const cleanerAvailabilityCompanyElement = document.querySelector('#cleaner-availability-company');
+const cleanerAvailabilityYearElement = document.querySelector('#cleaner-availability-year');
+const cleanerAvailabilityFileElement = document.querySelector('#cleaner-availability-file');
+const cleanerAvailabilityStatusElement = document.querySelector('#cleaner-availability-status');
+
+function cleanerAvailabilityLabel(config) {
+  if (!config?.windows?.length) return 'No cleaner availability schedule imported.';
+  const cleaners = [...new Set(config.windows.map((window) => window.cleaner))];
+  const dates = config.windows.map((window) => window.day).sort();
+  return `${config.windows.length} availability window${config.windows.length === 1 ? '' : 's'} imported for ${cleaners.join(', ')} (${dates[0]} to ${dates.at(-1)}).`;
+}
+async function loadCleanerAvailabilityStatus() {
+  const company = cleanerAvailabilityCompanyElement.value;
+  const key = CleaningCleanerAvailability.storageKey(company);
+  const stored = await chrome.storage.local.get(key);
+  cleanerAvailabilityStatusElement.textContent = cleanerAvailabilityLabel(stored[key]);
+}
+cleanerAvailabilityYearElement.value = String(new Date().getFullYear());
+cleanerAvailabilityCompanyElement.addEventListener('change', loadCleanerAvailabilityStatus);
+document.querySelector('#import-cleaner-availability').addEventListener('click', async (event) => {
+  const file = cleanerAvailabilityFileElement.files?.[0];
+  if (!file) {
+    cleanerAvailabilityStatusElement.textContent = 'Choose an Excel schedule first.';
+    return;
+  }
+  event.target.disabled = true;
+  cleanerAvailabilityStatusElement.textContent = 'Importing cleaner availability…';
+  try {
+    const company = cleanerAvailabilityCompanyElement.value;
+    const config = await CleaningXlsxImporter.parseCleanerAvailabilityWorkbook(await file.arrayBuffer(), {
+      company,
+      year: Number(cleanerAvailabilityYearElement.value) || new Date().getFullYear()
+    });
+    config.sourceFileName = file.name;
+    await chrome.storage.local.set({ [CleaningCleanerAvailability.storageKey(company)]: config });
+    cleanerAvailabilityStatusElement.textContent = cleanerAvailabilityLabel(config);
+    cleanerAvailabilityFileElement.value = '';
+  } catch (error) {
+    cleanerAvailabilityStatusElement.textContent = error.message || 'Could not import that Excel schedule.';
+  } finally {
+    event.target.disabled = false;
+  }
+});
+document.querySelector('#clear-cleaner-availability').addEventListener('click', async () => {
+  const company = cleanerAvailabilityCompanyElement.value;
+  if (!window.confirm(`Clear the imported cleaner availability for ${company.toUpperCase()}?`)) return;
+  await chrome.storage.local.remove(CleaningCleanerAvailability.storageKey(company));
+  cleanerAvailabilityFileElement.value = '';
+  await loadCleanerAvailabilityStatus();
+});
+
 const manualQuoteElement = document.querySelector('#manual-quote');
 const manualSummaryElement = document.querySelector('#manual-quote-summary');
 const manualAvailabilityElement = document.querySelector('#manual-availability');
@@ -242,7 +293,7 @@ function manualDuration(quote) {
 }
 function manualClock(value) { const hour = Math.floor(value / 60); const minute = value % 60; return `${hour % 12 || 12}:${String(minute).padStart(2, '0')} ${hour >= 12 ? 'PM' : 'AM'}`; }
 function manualDate(value) { return new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date(`${value}T12:00:00`)); }
-function manualKey(item) { return `${item.day}|${item.start}`; }
+function manualKey(item) { return `${item.day}|${item.start}|${item.cleaner || 'rafael'}`; }
 function manualPriceDuration(price, company) {
   const hours = Number(price || 0) / 100;
   return Math.round((company === 'kacs' ? CleaningQuoteEngine.roundToNearestHalfHour(hours) : Math.ceil(hours * 2) / 2) * 60);
@@ -316,6 +367,8 @@ async function findManualAvailability() {
   if (!geocode?.ok) throw new Error(geocode?.error || 'Could not locate that address.');
   const destination = geocode.location;
   const duration = manualDuration(quote);
+  const availabilityKey = CleaningCleanerAvailability.storageKey(quote.company);
+  const importedAvailability = (await chrome.storage.local.get(availabilityKey))[availabilityKey];
   const byDay = Object.groupBy(snapshot.jobs, (job) => job.date);
   const cleaners = [...new Set(snapshot.jobs.flatMap((job) => Array.isArray(job.cleaners) ? job.cleaners : []).filter(Boolean))];
   // KACS offers availability from Rafael's calendar only; jobs on the other
@@ -332,6 +385,7 @@ async function findManualAvailability() {
     manualAvailabilityElement.innerHTML = `<p class="manual-location-confirmed">Location confirmed: ${escapeHtml(destination.label)}</p><p class="manual-availability-note">Calculating availability… ${currentDay} of ${totalDays} days checked.</p>`;
     const day = cursor.toISOString().slice(0, 10);
     if (new Date(`${day}T12:00:00`).getDay() === 0) continue;
+    options.push(...CleaningCleanerAvailability.importedSlots(importedAvailability, day, duration));
     const dayJobs = byDay[day] || [];
     const scheduledJobs = quote.company === 'kacs'
       ? dayJobs.filter((job) => Array.isArray(job.cleaners) && job.cleaners.includes('Rafael'))
@@ -359,6 +413,7 @@ async function findManualAvailability() {
       break;
     }
   }
+  options.sort((left, right) => left.day.localeCompare(right.day) || left.start - right.start || String(left.cleaner).localeCompare(String(right.cleaner)));
   manualAvailability = { options, duration, compatibleTotal: options.length, approximateLocation: destination.label };
   selectedManualAvailability = new Set(options.slice(0, 3).map(manualKey));
 }
@@ -407,4 +462,5 @@ document.querySelector('#manual-copy-message').addEventListener('click', async (
 loadReviews();
 loadRelaySettings();
 loadLastPrestoScan();
+loadCleanerAvailabilityStatus();
 loadManualDraft().then(renderManualQuote);

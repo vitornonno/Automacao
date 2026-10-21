@@ -16,7 +16,7 @@
   "content_scripts": [
     {
       "matches": ["https://*.yelp.com/*", "https://*.yelp.com.br/*", "https://*.thumbtack.com/*"],
-      "js": ["pricing.js", "extractors.js", "quote-messages.js", "content.js"],
+      "js": ["pricing.js", "extractors.js", "quote-messages.js", "cleaner-availability.js", "content.js"],
       "css": ["panel.css"],
       "run_at": "document_idle"
     },
