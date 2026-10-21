@@ -88,11 +88,35 @@
     );
     return details;
   }
+  function detailsRequestMessage(lead, company, requestedDetails) {
+    const requested = new Set(requestedDetails || []);
+    const items = [];
+    if (requested.has('squareFeet')) items.push('• Approximate square footage');
+    if (requested.has('bedrooms')) items.push('• Number of bedrooms');
+    if (requested.has('bathrooms')) items.push('• Number of bathrooms');
+    if (requested.has('photos')) items.push('• A few photos of the main areas (optional)');
+    if (!items.length) return null;
+    const companyName = company === 'jheys' ? 'Jhey’s Cleaning' : 'KACS Cleaning Services LLC';
+    return [
+      greeting(lead?.customerName),
+      '',
+      `Thank you for reaching out to ${companyName}!`,
+      '',
+      'To prepare the most accurate estimate, could you please share the following:',
+      '',
+      ...items,
+      '',
+      'Once we have these details, we’ll be happy to provide your estimate and discuss the next steps.'
+    ].join('\n');
+  }
   const followUpDefinitions = {
     kacs: [
       {
-        signature: "i tried giving you a quick call to follow up in case you're still looking for help with your home cleaning",
-        message: (name) => [
+        signatures: [
+          "i tried giving you a quick call to follow up in case you're still looking for help with your home cleaning",
+          "i just wanted to follow up in case you're still looking for help with your home cleaning"
+        ],
+        message: (name, lead) => lead?.phoneNumber ? [
           `Hi ${name}, this is Frank just checking in!`,
           '',
           "I tried giving you a quick call to follow up in case you're still looking for help with your home cleaning.",
@@ -101,6 +125,15 @@
           'Our cleanings are fully customized to your priorities, so you get exactly what you need, effortlessly.',
           '',
           'Looking forward to your reply!'
+        ].join('\n') : [
+          `Hi ${name}, this is Frank from KACS Cleaning.`,
+          '',
+          "I just wanted to follow up in case you're still looking for help with your home cleaning.",
+          '',
+          'At KACS Cleaning, we specialize in making your life easier — delivering a spotless home without you lifting a finger.',
+          'Our cleanings are fully customized to your priorities, so you get exactly what you need, effortlessly.',
+          '',
+          'Let me know if you have any questions or special requests, we’d love to provide a personalized quote that fits exactly what you’re looking for.'
         ].join('\n')
       },
       {
@@ -140,7 +173,7 @@
       {
         signature: 'whether you are still considering options for your home cleaning',
         message: (name) => [
-          `Hi ${name}, this is Jhey’s Cleaning following up.`,
+          `Hi ${name}, this is Frank following up.`,
           '',
           'I wanted to check whether you are still considering options for your home cleaning.',
           '',
@@ -155,7 +188,7 @@
       {
         signature: 'follow up in case this message was previously overlooked',
         message: (name) => [
-          `Hi ${name}, this is Jhey’s Cleaning once again.`,
+          `Hi ${name}, this is Frank from Jhey’s Cleaning once again.`,
           '',
           'I wanted to follow up in case this message was previously overlooked. There is no pressure at all — I simply wanted to remain available should you still be deciding.',
           '',
@@ -168,7 +201,7 @@
       {
         signature: 'follow up once more regarding the estimate we shared with you',
         message: (name) => [
-          `Hi ${name}, this is Jhey’s Cleaning.`,
+          `Hi ${name}, this is Frank from Jhey’s Cleaning.`,
           '',
           'I wanted to follow up once more regarding the estimate we shared with you. I understand if timing may not be right just yet.',
           '',
@@ -197,8 +230,8 @@
     const history = String(conversationText || '').toLocaleLowerCase();
     return followUps.map((followUp, index) => ({
       number: index + 1,
-      sent: history.includes(followUp.signature),
-      message: followUp.message(lead?.customerName || 'there')
+      sent: (followUp.signatures || [followUp.signature]).some((signature) => history.includes(signature)),
+      message: followUp.message(lead?.customerName || 'there', lead)
     }));
   }
   function kacsMessage(review) {
@@ -324,6 +357,6 @@
     return 'This lead needs a manual review before a message can be prepared.';
   }
 
-  global.CleaningQuoteMessages = { approvedMessage, followUpStatus };
+  global.CleaningQuoteMessages = { approvedMessage, detailsRequestMessage, followUpStatus };
   if (typeof module !== 'undefined') module.exports = global.CleaningQuoteMessages;
 })(globalThis);

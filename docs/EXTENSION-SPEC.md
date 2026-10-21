@@ -80,7 +80,8 @@ Os registros são locais no armazenamento do Chrome e usam o ID único da lead d
 
 1. O painel calcula a proposta ou detecta a necessidade de informações.
 2. **Confirm quote** ou **Request details** grava o registro como `approved` e copia a mensagem para a área de transferência na mesma ação.
-3. Não há uma etapa obrigatória de aprovação em fila.
+3. **Copy details request** fica sempre disponível no painel da lead. O atendente seleciona individualmente square footage, bedrooms, bathrooms e/ou fotos das áreas principais; a ação copia apenas os detalhes marcados, mesmo que eles já estejam presentes na lead.
+4. Não há uma etapa obrigatória de aprovação em fila.
 
 Ao reabrir uma lead salva/aprovada/ajustada, não criar uma duplicata. O botão fica bloqueado e mostra o estado atual. Exceções:
 

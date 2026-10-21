@@ -37,7 +37,8 @@ function renderPrestoDebug(response) {
       startTime: job.startTime,
       customerName: job.customerName,
       coordinates: job.coordinates,
-      price: job.price
+      price: job.price,
+      cleaners: job.cleaners || []
     })),
     events: response.debug || []
   };
@@ -295,7 +296,7 @@ function renderManualAvailability() {
   }
   manualAvailabilityElement.innerHTML = `<p class="manual-location-confirmed">Location confirmed: ${escapeHtml(manualAvailability.approximateLocation)}</p>${manualAvailability.options.map((slot) => {
     const key = manualKey(slot);
-    return `<label class="manual-slot"><input type="checkbox" data-manual-availability="${escapeHtml(key)}" ${selectedManualAvailability.has(key) ? 'checked' : ''}><span><strong>${manualDate(slot.day)} · ${manualClock(slot.start)}–${manualClock(slot.start + 30)}</strong><small>Estimated end: ${manualClock(slot.start + manualAvailability.duration)}</small></span></label>`;
+    return `<label class="manual-slot"><input type="checkbox" data-manual-availability="${escapeHtml(key)}" ${selectedManualAvailability.has(key) ? 'checked' : ''}><span><strong>${manualDate(slot.day)} · ${manualClock(slot.start)}–${manualClock(slot.start + 30)}</strong><small>Estimated end: ${manualClock(slot.start + manualAvailability.duration)}${slot.cleaner ? ` · Team: ${escapeHtml(slot.cleaner)}` : ''}</small></span></label>`;
   }).join('')}`;
 }
 async function manualRouteMinutes(origin, destination) {
@@ -316,6 +317,11 @@ async function findManualAvailability() {
   const destination = geocode.location;
   const duration = manualDuration(quote);
   const byDay = Object.groupBy(snapshot.jobs, (job) => job.date);
+  const cleaners = [...new Set(snapshot.jobs.flatMap((job) => Array.isArray(job.cleaners) ? job.cleaners : []).filter(Boolean))];
+  // KACS offers availability from Rafael's calendar only; jobs on the other
+  // teams must not remove an otherwise valid Rafael opening.
+  const scheduleCleaners = quote.company === 'kacs' ? ['Rafael'] : cleaners;
+  if (!scheduleCleaners.length) throw new Error('This Presto scan has no cleaner assignments. Reload the extension and read the schedule again.');
   const startDate = new Date(`${snapshot.range.start}T12:00:00Z`);
   const endDate = new Date(`${snapshot.range.end}T12:00:00Z`);
   const options = [];
@@ -326,8 +332,15 @@ async function findManualAvailability() {
     manualAvailabilityElement.innerHTML = `<p class="manual-location-confirmed">Location confirmed: ${escapeHtml(destination.label)}</p><p class="manual-availability-note">Calculating availability… ${currentDay} of ${totalDays} days checked.</p>`;
     const day = cursor.toISOString().slice(0, 10);
     if (new Date(`${day}T12:00:00`).getDay() === 0) continue;
-    const jobs = (byDay[day] || []).slice().sort((a, b) => String(a.startTime).localeCompare(String(b.startTime)));
-    if (jobs.some((job) => !job.coordinates || !Number.isFinite(job.price) || !job.startTime)) continue;
+    const dayJobs = byDay[day] || [];
+    const scheduledJobs = quote.company === 'kacs'
+      ? dayJobs.filter((job) => Array.isArray(job.cleaners) && job.cleaners.includes('Rafael'))
+      : dayJobs;
+    if (scheduledJobs.some((job) => !job.coordinates || !Number.isFinite(job.price) || !job.startTime || !Array.isArray(job.cleaners) || !job.cleaners.length)) continue;
+    const cleaner = quote.company === 'kacs'
+      ? 'Rafael'
+      : [...scheduleCleaners].sort((left, right) => dayJobs.filter((job) => job.cleaners.includes(left)).length - dayJobs.filter((job) => job.cleaners.includes(right)).length)[0];
+    const jobs = scheduledJobs.filter((job) => job.cleaners.includes(cleaner)).sort((a, b) => String(a.startTime).localeCompare(String(b.startTime)));
     for (let index = 0; index <= jobs.length; index += 1) {
       const previous = jobs[index - 1]; const next = jobs[index];
       let start = 480;
@@ -342,7 +355,7 @@ async function findManualAvailability() {
         const arrival = start + duration + 30 + await manualRouteMinutes(destination, next.coordinates);
         if (arrival > hour * 60 + minute) continue;
       }
-      options.push({ day, start });
+      options.push({ day, start, cleaner });
       break;
     }
   }

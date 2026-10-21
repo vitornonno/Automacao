@@ -18,6 +18,8 @@
   let availability = null;
   let selectedAvailability = new Set();
   let confirmationFeedback = '';
+  let requestedDetails = new Set();
+  let detailsRequestOpen = false;
 
   function logDebug(event, detail = {}) {
     debugEvents = [{ at: new Date().toLocaleTimeString(), event, detail }, ...debugEvents].slice(0, 60);
@@ -93,6 +95,8 @@
     selectedAvailability = new Set();
     confirmationFeedback = '';
     lead = CleaningLeadExtractor.extractLead();
+    requestedDetails = new Set(['squareFeet', 'bedrooms', 'bathrooms'].filter((field) => !String(lead?.[field] || '').trim()));
+    detailsRequestOpen = false;
     quote = CleaningQuoteEngine.calculateQuote(lead);
     logDebug('Capture attempt', captureSnapshot(lead, quote).lead || {});
     if (!root.isConnected) document.documentElement.append(root);
@@ -147,6 +151,7 @@
     availability = null;
     selectedAvailability = new Set();
     confirmationFeedback = '';
+    detailsRequestOpen = false;
     if (!root.isConnected) document.documentElement.append(root);
     root.innerHTML = '<header><span>Lead estimate</span><button data-action="close" aria-label="Close">×</button></header><section class="result"><p><strong>Loading lead data…</strong><small>Waiting for Yelp to finish loading this lead.</small></p></section>';
     [3000, 4500, 6000].forEach((delay) => setTimeout(() => {
@@ -182,6 +187,11 @@
         const destination = geocode.location; const duration = quoteDurationMinutes();
         if (!Number.isFinite(duration) || duration <= 0) throw new Error('A service duration or usable price is required to calculate availability.');
       const grouped = Object.groupBy(snapshot.jobs, (job) => job.date);
+      const cleaners = [...new Set(snapshot.jobs.flatMap((job) => Array.isArray(job.cleaners) ? job.cleaners : []).filter(Boolean))];
+      // KACS availability is intentionally based on Rafael's route only. Other
+      // teams can be working at the same time without consuming Rafael's slot.
+      const scheduleCleaners = quote.company === 'kacs' ? ['Rafael'] : cleaners;
+      if (!scheduleCleaners.length) throw new Error('This Presto scan has no cleaner assignments. Reload the extension and read the schedule again.');
         const options = []; const unavailableDays = []; const availabilityDebug = [];
       for (const day of dateRange(snapshot.range.start, snapshot.range.end)) {
           if (isSunday(day)) {
@@ -190,17 +200,23 @@
             continue;
           }
           const dayJobs = grouped[day] || [];
-          if (dayJobs.some((job) => !job.coordinates || !Number.isFinite(job.price) || job.price <= 0)) {
+          const scheduledJobs = quote.company === 'kacs'
+            ? dayJobs.filter((job) => Array.isArray(job.cleaners) && job.cleaners.includes('Rafael'))
+            : dayJobs;
+          if (scheduledJobs.some((job) => !job.coordinates || !Number.isFinite(job.price) || job.price <= 0 || !Array.isArray(job.cleaners) || !job.cleaners.length)) {
             unavailableDays.push(day);
-            availabilityDebug.push({ day, result: 'unavailable', reason: 'A scheduled job is missing a location or usable price.' });
+            availabilityDebug.push({ day, result: 'unavailable', reason: 'A Rafael job is missing a location, price, or cleaner assignment.' });
             continue;
           }
-          const jobs = dayJobs.sort((a, b) => minutes(a.startTime) - minutes(b.startTime));
+          const cleaner = quote.company === 'kacs'
+            ? 'Rafael'
+            : [...scheduleCleaners].sort((left, right) => dayJobs.filter((job) => job.cleaners.includes(left)).length - dayJobs.filter((job) => job.cleaners.includes(right)).length)[0];
+          const jobs = scheduledJobs.filter((job) => job.cleaners.includes(cleaner)).sort((a, b) => minutes(a.startTime) - minutes(b.startTime));
         const candidates = [];
           if (!jobs.length) {
-            candidates.push({ start: 480, previous: null, next: null });
-            availabilityDebug.push({ day, result: 'candidate', start: 480, reason: 'No scheduled jobs; no between-job route is required.' });
-            options.push({ day, start: 480, previous: null, next: null });
+            candidates.push({ cleaner, start: 480, previous: null, next: null });
+            availabilityDebug.push({ day, cleaner, result: 'candidate', start: 480, reason: 'No scheduled jobs for this cleaner; no between-job route is required.' });
+            options.push({ day, cleaner, start: 480, previous: null, next: null });
             continue;
           }
         for (let i = 0; i <= jobs.length; i += 1) {
@@ -225,11 +241,12 @@
             }
             if (start + duration <= 1140) {
               candidates.push({
+                cleaner,
                 start,
                 previous: previous ? { customerName: previous.customerName, startTime: previous.startTime, duration: previousDuration, end: previousEnd, travelToLead: routeBefore } : null,
                 next: next ? { customerName: next.customerName, startTime: next.startTime, travelFromLead: routeAfter } : null
               });
-              availabilityDebug.push({ day, result: 'candidate', start, serviceEnd: start + duration, previousJob: previous?.customerName || null, nextJob: next?.customerName || null, routeBefore, routeAfter });
+              availabilityDebug.push({ day, cleaner, result: 'candidate', start, serviceEnd: start + duration, previousJob: previous?.customerName || null, nextJob: next?.customerName || null, routeBefore, routeAfter });
             } else {
               availabilityDebug.push({ day, result: 'rejected', start, previousJob: previous?.customerName || null, nextJob: next?.customerName || null, routeBefore, routeAfter, reason: 'Service would end after 7:00 PM.' });
             }
@@ -287,7 +304,7 @@
       const company = quote.company === 'kacs' ? 'KACS Cleaning Services' : "Jhey's Cleaning";
       const slot = (item, index) => {
         const key = availabilityKey(item);
-        return `<article class="availability-slot ${selectedAvailability.has(key) ? 'is-selected' : ''}"><label class="availability-slot-top"><input type="checkbox" data-availability-key="${escapeHtml(key)}" ${selectedAvailability.has(key) ? 'checked' : ''}><span class="availability-rank">${index + 1}</span><strong>${availabilityDay(item.day)}</strong><span class="availability-time"><span class="availability-window-label">Arrival window</span><span class="availability-window">${clock(item.start)}–${clock(item.start + 30)}</span></span></label><div class="availability-end">Estimated end: <strong>${clock(item.start + availability.duration)}</strong></div>${availabilityContext(item)}</article>`;
+        return `<article class="availability-slot ${selectedAvailability.has(key) ? 'is-selected' : ''}"><label class="availability-slot-top"><input type="checkbox" data-availability-key="${escapeHtml(key)}" ${selectedAvailability.has(key) ? 'checked' : ''}><span class="availability-rank">${index + 1}</span><strong>${availabilityDay(item.day)}</strong><span class="availability-time"><span class="availability-window-label">Arrival window</span><span class="availability-window">${clock(item.start)}–${clock(item.start + 30)}</span></span></label><div class="availability-end">Estimated end: <strong>${clock(item.start + availability.duration)}</strong>${item.cleaner ? ` · Team: <strong>${escapeHtml(item.cleaner)}</strong>` : ''}</div>${availabilityContext(item)}</article>`;
       };
       const slots = availability.options.map(slot).join('') || '<p class="availability-empty">No compatible slots were found in this 20-day window.</p>';
       const unavailable = availability.unavailableDays.length ? `${availability.unavailableDays.length} days were not compatible` : 'All eligible days had a compatible gap';
@@ -340,6 +357,16 @@
     const followUps = CleaningQuoteMessages.followUpStatus(quote.company, lead, conversationText());
     return followUps.map((followUp) => `<button data-action="copy-follow-up" data-follow-up-number="${followUp.number}" ${followUp.sent ? 'disabled' : ''}>${followUp.sent ? `Follow-up ${followUp.number} sent` : `Copy follow-up ${followUp.number}`}</button>`).join('');
   }
+  function detailsRequestMarkup() {
+    if (!detailsRequestOpen) return '';
+    const options = [
+      ['squareFeet', 'Square footage'],
+      ['bedrooms', 'Bedrooms'],
+      ['bathrooms', 'Bathrooms'],
+      ['photos', 'Photos of main areas']
+    ];
+    return `<section class="details-request"><strong>Request more details</strong><small>Choose exactly what you want to ask the client for, even if some details are already present.</small><div>${options.map(([field, label]) => `<label><input type="checkbox" data-request-detail="${field}" ${requestedDetails.has(field) ? 'checked' : ''}>${label}</label>`).join('')}</div></section>`;
+  }
   function render() {
     if (queueMode) { renderQueue(); return; }
     const saveLabel = blocksSaveForApproval()
@@ -359,6 +386,14 @@
     const copyLabel = availability?.status === 'ready'
       ? `Copy approved message (${selectedAvailability.size} date${selectedAvailability.size === 1 ? '' : 's'})`
       : 'Copy approved message';
+    const primaryAction = quote.status === 'missing_size'
+      ? detailsRequestOpen
+        ? `<button data-action="copy-details-request" ${requestedDetails.size ? '' : 'disabled'}>Copy selected details request</button>`
+        : '<button data-action="open-details-request">Request details</button>'
+      : `<button data-action="save" ${!canSaveForApproval(quote) || blocksSaveForApproval() ? 'disabled' : ''}>${saveLabel}</button>`;
+    const detailsAction = detailsRequestOpen
+      ? `<button data-action="copy-details-request" ${requestedDetails.size ? '' : 'disabled'}>Copy selected details request</button>`
+      : '<button data-action="open-details-request">Request details</button>';
     root.innerHTML = `
         <header><span>Lead estimate</span><div><button data-action="debug" aria-label="Verbose debug">Debug</button><button data-action="close" aria-label="Close">×</button></div></header>
       <section class="lead-fields">
@@ -370,7 +405,7 @@
         ${input('Bathrooms', lead.bathrooms, 'bathrooms', 'number')}
       </section>
       <section class="result"><p>${displayQuote(quote)}</p><dl><div><dt>Size band</dt><dd>${quote.size.band ? `up to ${quote.size.band} sq. ft.` : 'Not resolved'}</dd></div><div><dt>Source</dt><dd>${quote.size.source || 'Manual review'}</dd></div><div><dt>Status</dt><dd>${quote.status.replaceAll('_', ' ')}</dd></div></dl></section>
-        ${availabilityMarkup()}${confirmationFeedback ? `<p class="existing-review">${escapeHtml(confirmationFeedback)}</p>` : ''}${reviewMessage}<footer><button data-action="copy-approved" ${canCopyApprovedMessage() ? '' : 'disabled'}>${copyLabel}</button>${followUpButtons()}<button data-action="availability" ${quote.status !== 'ready_for_review' ? 'disabled' : ''}>Find availability</button><button data-action="save" ${!canSaveForApproval(quote) || blocksSaveForApproval() ? 'disabled' : ''}>${saveLabel}</button></footer>${debugMarkup()}`;
+        ${availabilityMarkup()}${detailsRequestMarkup()}${confirmationFeedback ? `<p class="existing-review">${escapeHtml(confirmationFeedback)}</p>` : ''}${reviewMessage}<footer><button data-action="copy-approved" ${canCopyApprovedMessage() ? '' : 'disabled'}>${copyLabel}</button>${quote.status === 'missing_size' ? '' : detailsAction}${followUpButtons()}<button data-action="availability" ${quote.status !== 'ready_for_review' ? 'disabled' : ''}>Find availability</button>${primaryAction}</footer>${debugMarkup()}`;
   }
   async function renderQueue() {
     const records = await chrome.storage.local.get(null);
@@ -489,6 +524,22 @@
       }
       render();
     }
+    if (action === 'copy-details-request') {
+      const message = CleaningQuoteMessages.detailsRequestMessage(lead, quote.company, requestedDetails);
+      if (!message) return;
+      try {
+        await navigator.clipboard.writeText(message);
+        confirmationFeedback = 'Details request copied to clipboard.';
+      } catch {
+        confirmationFeedback = 'Could not copy the details request.';
+      }
+      render();
+    }
+    if (action === 'open-details-request') {
+      detailsRequestOpen = true;
+      confirmationFeedback = '';
+      render();
+    }
     if (action === 'availability') findAvailability();
     const card = event.target.closest('[data-review-id]');
     if (card && !event.target.closest('button, a')) {
@@ -560,6 +611,13 @@
     }
   });
   root.addEventListener('change', (event) => {
+    const requestedDetail = event.target.closest('[data-request-detail]');
+    if (requestedDetail) {
+      if (requestedDetail.checked) requestedDetails.add(requestedDetail.dataset.requestDetail);
+      else requestedDetails.delete(requestedDetail.dataset.requestDetail);
+      render();
+      return;
+    }
     const checkbox = event.target.closest('[data-availability-key]');
     if (checkbox) {
       if (checkbox.checked) selectedAvailability.add(checkbox.dataset.availabilityKey);

@@ -114,10 +114,15 @@ function selectedJobDetails(card) {
   const coordinates = match ? { latitude: Number(match[1]), longitude: Number(match[2]), link: mapLink.href } : null;
   const locationRow = mapLink?.closest('.card-info-row');
   const priceMatch = text(card).match(/pre[cç]o:\s*\$\s*([\d,.]+)/i);
+  const cleanerRow = [...card.querySelectorAll('.card-info-row')].find((row) => row.querySelector('.fa-users'));
+  const cleaners = [...new Set([...(cleanerRow?.querySelectorAll('.fa-star') || [])]
+    .map((icon) => text(icon.nextElementSibling))
+    .filter((item) => item && !/%$/.test(item) && !/^n[aã]o acertado$/i.test(item) && !/^\$/.test(item)))];
   return {
     address: text(locationRow?.querySelector('.card-info-column-text')) || null,
     coordinates,
-    price: priceMatch ? moneyValue(priceMatch[1]) : null
+    price: priceMatch ? moneyValue(priceMatch[1]) : null,
+    cleaners
   };
 }
 
@@ -188,8 +193,8 @@ async function visibleJobSnapshot(debug) {
     liveEvent.click();
     const loaded = await waitForCardToOpen(event.id);
     if (loaded) await sleep(900);
-    const details = loaded ? selectedJobDetails(openedServiceCard()) : { address: null, coordinates: null, price: null };
-    debugEvent(debug, loaded ? 'Job card captured' : 'Job card timed out', { id: event.id, loaded, hasCoordinates: Boolean(details.coordinates), hasPrice: Number.isFinite(details.price) });
+    const details = loaded ? selectedJobDetails(openedServiceCard()) : { address: null, coordinates: null, price: null, cleaners: [] };
+    debugEvent(debug, loaded ? 'Job card captured' : 'Job card timed out', { id: event.id, loaded, hasCoordinates: Boolean(details.coordinates), hasPrice: Number.isFinite(details.price), cleaners: details.cleaners });
     jobs.push({
       id: event.id,
       date: event.date,
