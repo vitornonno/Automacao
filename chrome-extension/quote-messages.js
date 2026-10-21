@@ -18,7 +18,7 @@
       '💲 Rate: $50 per cleaner, per hour',
       '👥 Team: 1-2 cleaning professionals, depending on availability and the scope of work',
       '',
-      `Based on our experience with homes of similar size, this service typically takes approximately ${hours(quote.estimatedHours.minimum)} to ${hours(quote.estimatedHours.maximum)} hours with a 2-cleaner team, depending on the home’s condition.`,
+      `Based on our experience with homes of similar size, this service typically takes approximately ${hours(quote.estimatedHours.minimum)}-${hours(quote.estimatedHours.maximum)} hours with a 2-cleaner team, depending on the home’s condition.`,
       '',
       'Upon arrival, our team will perform a brief walkthrough of the property and provide a more accurate estimate of the expected cleaning time before work begins.'
     ];
@@ -26,8 +26,14 @@
   function serviceLimitations(lead) {
     const requested = String(lead?.extraServices || '').toLowerCase();
     const notes = [];
-    if (/carpet|rug/.test(requested)) {
+    const requestsCarpet = /carpet/.test(requested);
+    const requestsRug = /rug/.test(requested);
+    if (requestsCarpet && requestsRug) {
       notes.push('⚠️ Please note that we do not provide professional carpet or rug shampoo/extraction cleaning, but we can vacuum carpeted areas and rugs as part of the service.');
+    } else if (requestsCarpet) {
+      notes.push('⚠️ Please note that we do not provide professional carpet shampoo/extraction cleaning, but we can vacuum carpeted areas as part of the service.');
+    } else if (requestsRug) {
+      notes.push('⚠️ Please note that we do not provide professional rug shampoo/extraction cleaning, but we can vacuum rugs as part of the service.');
     }
     if (/upholstery|sofa|couch/.test(requested)) {
       notes.push('⚠️ Please note that we do not provide professional upholstery cleaning.');
@@ -35,7 +41,22 @@
     if (/pet\s*odor|odor.*pet/.test(requested)) {
       notes.push('⚠️ Please note that we do not provide specialized pet odor treatment or guaranteed odor removal, but we can thoroughly clean the affected areas and help reduce odors as part of the service.');
     }
-    return notes;
+    if (notes.length < 2) return notes;
+    const groupedNote = (note) => {
+      if (/carpet or rug shampoo/i.test(note)) return '• Professional carpet or rug shampoo/extraction cleaning is not included; carpeted areas and rugs can still be vacuumed as part of the service.';
+      if (/carpet shampoo/i.test(note)) return '• Professional carpet shampoo/extraction cleaning is not included; carpeted areas can still be vacuumed as part of the service.';
+      if (/rug shampoo/i.test(note)) return '• Professional rug shampoo/extraction cleaning is not included; rugs can still be vacuumed as part of the service.';
+      if (/upholstery cleaning/i.test(note)) return '• Professional upholstery cleaning is not included.';
+      if (/pet odor treatment/i.test(note)) return '• Specialized pet odor treatment and guaranteed odor removal are not included; affected areas can still be thoroughly cleaned to help reduce odors.';
+      return note;
+    };
+    return [
+      [
+        '🧼 A quick note about the additional services requested:',
+        '',
+        ...notes.map(groupedNote)
+      ].join('\n')
+    ];
   }
   function separatedParagraphs(items) {
     return items.flatMap((item, index) => index ? ['', item] : [item]);

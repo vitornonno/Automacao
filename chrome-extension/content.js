@@ -161,7 +161,14 @@
   function ceilHalfHour(value) { return Math.ceil(value / 30) * 30; }
   function isSunday(date) { return new Date(`${date}T12:00:00`).getDay() === 0; }
   function dateRange(start, end) { const values = []; const date = new Date(`${start}T12:00:00Z`); const last = new Date(`${end}T12:00:00Z`); while (date <= last) { values.push(date.toISOString().slice(0, 10)); date.setUTCDate(date.getUTCDate() + 1); } return values; }
-  function quoteDurationMinutes() { return quote?.estimatedHours ? Math.ceil(quote.estimatedHours.maximum * 60) : Math.ceil(((quote?.priceRange?.maximum || quote?.amount || 0) / 100) * 60); }
+  function priceDurationMinutes(price) {
+    const rawHours = Number(price || 0) / 100;
+    const hours = quote?.company === 'kacs'
+      ? CleaningQuoteEngine.roundToNearestHalfHour(rawHours)
+      : Math.ceil(rawHours * 2) / 2;
+    return Math.round(hours * 60);
+  }
+  function quoteDurationMinutes() { return quote?.estimatedHours ? Math.round(quote.estimatedHours.maximum * 60) : priceDurationMinutes(quote?.priceRange?.maximum || quote?.amount); }
   async function routeMinutes(origin, destination) { const response = await chrome.runtime.sendMessage({ type: 'ROUTE_RELAY_REQUEST', request: { origin, destination } }); if (!response?.ok) throw new Error(response?.error || 'Route lookup failed.'); return Math.ceil(response.route.durationSeconds / 60); }
   async function findAvailability() {
     availability = { status: 'loading' }; render();
@@ -201,7 +208,7 @@
             let routeBefore = null; let routeAfter = null;
             let previousEnd = null; let previousDuration = null;
             if (previous) {
-              previousDuration = Math.ceil(previous.price / 100 * 60);
+              previousDuration = priceDurationMinutes(previous.price);
               previousEnd = minutes(previous.startTime) + previousDuration;
               routeBefore = await routeMinutes(previous.coordinates, destination);
               start = previousEnd + 30 + routeBefore;

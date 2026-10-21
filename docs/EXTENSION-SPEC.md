@@ -44,13 +44,14 @@ Quando os valores do estado Apollo divergirem das respostas atuais visíveis no 
 - Uma nova lead marcada como `Regular home cleaning` sempre vira **First Cleaning**, mesmo se pedir atendimento semanal, quinzenal ou mensal. Tarifas recorrentes são apenas para clientes já atendidos após First/Deep Cleaning.
 - Leads Move-In e Move-Out usam uma única cotação preliminar: a média das duas colunas correspondentes da tabela. A mensagem pergunta se o serviço é Move-In ou Move-Out para fechar uma estimativa mais precisa e justa.
 - A metragem usa a próxima faixa superior da tabela.
-- Sem metragem, quartos/banheiros definem uma faixa. A combinação ambígua 3 quartos / 2 banheiros usa 1.600 sq. ft.; como não há linha exata para 3 quartos / 3 banheiros, ela também usa a faixa conservadora viável de 1.600 sq. ft.; 4 quartos / 4 banheiros usa a faixa conservadora de 3.000 sq. ft.
+- Sem metragem, quartos/banheiros definem uma faixa. Quando não houver linha exata, usar a menor combinação cadastrada que tenha pelo menos a mesma quantidade de quartos e banheiros; isto produz a faixa viável mais próxima de forma conservadora (por exemplo, 3 quartos / 1 banheiro usa a linha 3 quartos / 2 banheiros, de 1.600 sq. ft.). Se nenhuma linha cobrir ambos os números, usar a maior faixa disponível. A combinação 4 quartos / 4 banheiros usa a faixa conservadora de 3.000 sq. ft.
 - Acima de 3.000 sq. ft. há revisão manual.
 - Sem metragem e sem combinação válida de quartos/banheiros, a extensão prepara um pedido de dados, em vez de gerar cotação.
 
 ## KACS
 
 - A mensagem informa somente a duração estimada: horas-base da tabela + tolerância de 1,5 h.
+- Toda estimativa usa somente incrementos de 30 minutos (`1`, `1.5`, `2`, `2.5` etc.). Para a referência operacional de preço, dividir o valor por US$100/h e arredondar ao intervalo de meia hora mais próximo antes de adicionar a tolerância de 1,5 h: US$220 vira `2–3.5 hours` e US$280 vira `3–4.5 hours`. A mesma regra é usada para estimar a duração dos jobs KACS na agenda.
 - Recomenda cobrança por hora: US$50 por cleaner/hora, com equipe de 1–2 profissionais. A referência interna da equipe é US$100/h.
 - Nunca mostrar ao cliente um total em dólares estimado.
 - Para dados de tamanho faltantes, solicitar quartos e banheiros; metragem e fotos são opcionais.
@@ -67,9 +68,9 @@ Quando os valores do estado Apollo divergirem das respostas atuais visíveis no 
 
 ## Limitações de serviço nas mensagens de cotação
 
-Somente quando a lead pedir o item correspondente, incluir os blocos abaixo logo depois da cotação. Cada aviso começa com `⚠️` e avisos diferentes são separados por uma linha em branco.
+Somente quando a lead pedir o item correspondente, incluir os blocos abaixo logo depois da cotação. Quando houver uma única limitação, usar o aviso direto com `⚠️`. Quando houver duas ou mais, agrupá-las em uma única nota `🧼 A quick note about the additional services requested:` com bullets neutros, evitando uma sequência visual de alertas.
 
-- Carpet ou rug: não há shampoo/extraction profissional; há vacuuming de áreas com carpete e tapetes.
+- Carpet ou rug: o aviso menciona somente o item solicitado. Para carpet, não há shampoo/extraction profissional e há vacuuming das áreas com carpete; para rug, não há shampoo/extraction profissional e há vacuuming dos tapetes. Se ambos forem solicitados, usar o aviso combinado de carpet e rug.
 - Upholstery, sofa ou couch: não há limpeza profissional de estofados.
 - Pet odor treatment: não há tratamento especializado ou garantia de remoção de odores; a equipe pode limpar profundamente as áreas e ajudar a reduzir odores.
 
@@ -95,6 +96,7 @@ Ao reabrir uma lead salva/aprovada/ajustada, não criar uma duplicata. O botão 
 Todos os dados operacionais ficam no perfil local do Chrome, em `chrome.storage.local`:
 
 - Cada cotação confirmada é armazenada pela chave única `lead:<id-da-lead-do-yelp>`.
+- No popup da extensão, **Clear queue** remove, após confirmação, todos os registros locais `lead:*`. Não remove snapshots de agenda do Presto, token do relay ou qualquer dado externo.
 - A agenda lida do Presto é armazenada por empresa em `prestoJobs:kacs` e `prestoJobs:jheys`.
 - Uma nova leitura do Presto substitui o snapshot anterior daquela empresa.
 - Esses dados não são gravados em arquivos do projeto, no Presto, no CRM ou no Cloudflare.

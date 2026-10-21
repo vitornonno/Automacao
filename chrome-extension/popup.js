@@ -111,6 +111,25 @@ reviewsElement.addEventListener('click', async (event) => {
   await loadReviews();
 });
 document.querySelector('#refresh').addEventListener('click', loadReviews);
+document.querySelector('#clear-queue').addEventListener('click', async (event) => {
+  const records = await chrome.storage.local.get(null);
+  const keys = Object.keys(records).filter((key) => key.startsWith('lead:'));
+  if (!keys.length) {
+    summaryElement.textContent = 'The queue is already empty.';
+    return;
+  }
+  if (!window.confirm(`Clear all ${keys.length} saved lead${keys.length === 1 ? '' : 's'} from the local queue? This cannot be undone.`)) return;
+  event.target.disabled = true;
+  try {
+    await chrome.storage.local.remove(keys);
+    await loadReviews();
+    summaryElement.textContent = `${keys.length} saved lead${keys.length === 1 ? '' : 's'} removed from the local queue.`;
+  } catch {
+    summaryElement.textContent = 'Could not clear the local queue.';
+  } finally {
+    event.target.disabled = false;
+  }
+});
 document.querySelectorAll('.filter').forEach((button) => button.addEventListener('click', () => {
   selectedFilter = button.dataset.filter;
   document.querySelectorAll('.filter').forEach((item) => item.classList.toggle('active', item === button));

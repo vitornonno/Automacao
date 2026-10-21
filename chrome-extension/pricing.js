@@ -53,6 +53,12 @@
     '2|2.5': 1800, '4|2.5': 2000, '4|3': 2400, '4|4': 3000, '5|3.5': 2600, '5|4': 3000
   };
 
+  const BED_BATH_BANDS = Object.entries(BED_BATH_TO_BAND)
+    .map(([dimensions, band]) => {
+      const [bedrooms, bathrooms] = dimensions.split('|').map(Number);
+      return { bedrooms, bathrooms, band };
+    });
+
   function normalizeService(value) {
     if (!value) return null;
     const text = String(value).toLowerCase().replace(/[–—]/g, '-').replace(/\s+/g, ' ').trim();
@@ -85,6 +91,17 @@
     return Number.isFinite(number) ? number : null;
   }
 
+  function roundToNearestHalfHour(value) {
+    return Math.round(Number(value) * 2) / 2;
+  }
+
+  function conservativeBedBathBand(bedrooms, bathrooms) {
+    const candidates = BED_BATH_BANDS
+      .filter((entry) => entry.bedrooms >= bedrooms && entry.bathrooms >= bathrooms)
+      .sort((left, right) => left.band - right.band || left.bedrooms - right.bedrooms || left.bathrooms - right.bathrooms);
+    return candidates[0]?.band || Math.max(...SIZE_BANDS);
+  }
+
   function chooseSizeBand(lead) {
     const squareFeet = normalizeNumber(lead.squareFeet);
     if (squareFeet) {
@@ -96,6 +113,13 @@
     if (bedrooms && bathrooms) {
       const band = BED_BATH_TO_BAND[`${bedrooms}|${bathrooms}`];
       if (band) return { status: 'resolved', band, source: 'bedrooms_bathrooms', bedrooms, bathrooms };
+      return {
+        status: 'resolved',
+        band: conservativeBedBathBand(bedrooms, bathrooms),
+        source: 'bedrooms_bathrooms_conservative',
+        bedrooms,
+        bathrooms
+      };
     }
     return { status: 'missing_size' };
   }
@@ -130,9 +154,10 @@
         return { ...base, status: 'manual_hours_required', hourlyRate: 100, reason: 'Homes above 3,000 sq. ft. require a human time estimate.' };
       }
         const moveInOut = service === 'move_in_out';
-        const baseHours = moveInOut
+        const rawBaseHours = moveInOut
           ? (KACS_HOURS[size.band][SERVICE_INDEX.indexOf('move_in')] + KACS_HOURS[size.band][SERVICE_INDEX.indexOf('move_out')]) / 2
           : KACS_HOURS[size.band][SERVICE_INDEX.indexOf(service)];
+      const baseHours = roundToNearestHalfHour(rawBaseHours);
       return {
         ...base,
         quoteType: 'time_only',
@@ -163,6 +188,6 @@
     };
   }
 
-  global.CleaningQuoteEngine = { calculateQuote, chooseSizeBand, normalizeService, resolveService, resolveCompany, SERVICES, SIZE_BANDS, INITIAL_LEAD_SERVICE_IDS };
+  global.CleaningQuoteEngine = { calculateQuote, chooseSizeBand, normalizeService, resolveService, resolveCompany, roundToNearestHalfHour, conservativeBedBathBand, SERVICES, SIZE_BANDS, INITIAL_LEAD_SERVICE_IDS };
   if (typeof module !== 'undefined') module.exports = global.CleaningQuoteEngine;
 })(typeof globalThis !== 'undefined' ? globalThis : window);
