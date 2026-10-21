@@ -380,13 +380,44 @@
     if (!records[key]) return;
     await chrome.storage.local.set({ [key]: { ...records[key], state, updatedAt: new Date().toISOString() } });
   }
-  function recalculate() {
+  async function syncApprovedMessage({ invalidateAvailability = false } = {}) {
+    if (!canCopyApprovedMessage()) return false;
+    if (invalidateAvailability) {
+      availability = null;
+      selectedAvailability = new Set();
+    }
+    const slots = selectedAvailabilitySlots();
+    const reviewToCopy = {
+      ...existingReview,
+      lead: { ...lead },
+      quote,
+      availability: slots === null ? (invalidateAvailability ? [] : existingReview.availability || []) : slots,
+      availabilitySearch: slots === null
+        ? (invalidateAvailability ? null : existingReview.availabilitySearch || null)
+        : { compatibleTotal: availability.compatibleTotal || 0 },
+      updatedAt: new Date().toISOString()
+    };
+    await chrome.storage.local.set({ [reviewKey(lead.id)]: reviewToCopy });
+    existingReview = reviewToCopy;
+    try {
+      await navigator.clipboard.writeText(CleaningQuoteMessages.approvedMessage(reviewToCopy));
+      confirmationFeedback = invalidateAvailability
+        ? 'Quote and clipboard message updated. Recalculate availability before offering dates.'
+        : 'Approved message updated in the clipboard.';
+      return true;
+    } catch {
+      confirmationFeedback = 'Quote updated, but the approved message could not be copied.';
+      return false;
+    }
+  }
+  async function recalculate() {
     root.querySelectorAll('[data-field]').forEach((field) => {
       if (field.dataset.field === 'companyOverride') companyOverride = field.value || null;
       else if (field.dataset.field === 'serviceType') lead[field.dataset.field] = CleaningQuoteEngine.SERVICES[field.value] || null;
       else lead[field.dataset.field] = field.value || null;
     });
     quote = CleaningQuoteEngine.calculateQuote(lead, { companyOverride });
+    await syncApprovedMessage({ invalidateAvailability: true });
     render();
   }
   root.addEventListener('click', async (event) => {
@@ -410,7 +441,12 @@
         const slots = selectedAvailabilitySlots();
         const reviewToCopy = slots === null
           ? existingReview
-          : { ...existingReview, availability: slots, updatedAt: new Date().toISOString() };
+          : {
+            ...existingReview,
+            availability: slots,
+            availabilitySearch: { compatibleTotal: availability.compatibleTotal || 0 },
+            updatedAt: new Date().toISOString()
+          };
         await navigator.clipboard.writeText(CleaningQuoteMessages.approvedMessage(reviewToCopy));
         if (slots !== null) {
           await chrome.storage.local.set({ [reviewKey(lead.id)]: reviewToCopy });
@@ -498,6 +534,7 @@
       if (checkbox.checked) selectedAvailability.add(checkbox.dataset.availabilityKey);
       else selectedAvailability.delete(checkbox.dataset.availabilityKey);
       checkbox.closest('.availability-slot')?.classList.toggle('is-selected', checkbox.checked);
+      void syncApprovedMessage();
       const copyButton = root.querySelector('[data-action="copy-approved"]');
       if (copyButton && availability?.status === 'ready') {
         const count = selectedAvailability.size;
@@ -505,7 +542,7 @@
       }
       return;
     }
-    if (event.target.closest('[data-field]')) recalculate();
+    if (event.target.closest('[data-field]')) void recalculate();
   });
   const originalPushState = history.pushState;
   history.pushState = function patchedPushState(...args) {

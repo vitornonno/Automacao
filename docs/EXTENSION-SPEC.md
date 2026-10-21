@@ -86,6 +86,7 @@ Ao reabrir uma lead salva/aprovada/ajustada, não criar uma duplicata. O botão 
 - Se um registro anterior usou a empresa errada, a extensão permite gerar uma versão corrigida.
 - Se novos detalhes de produtos ou serviços adicionais estiverem mais completos do que o registro salvo, a extensão permite gerar uma versão corrigida.
 - Mudanças em metragem, quartos ou banheiros também permitem recalcular e confirmar uma versão atualizada.
+- Quando uma cotação já aprovada for alterada manualmente no painel (empresa, serviço, metragem, quartos ou banheiros), a extensão recalcula e atualiza imediatamente o registro e a mensagem da área de transferência. Como a duração pode mudar, quaisquer datas de disponibilidade anteriores são removidas até uma nova busca ser executada. Marcar ou desmarcar uma data compatível também atualiza a mensagem copiada.
 
 ## Dados locais e privacidade
 
@@ -119,7 +120,7 @@ O Presto será a fonte de verdade para agenda. KACS e Jhey's usam agendas indepe
 - A leitura da agenda e dos detalhes considera apenas a data atual na Califórnia (`America/Los_Angeles`) e datas futuras; jobs de dias anteriores são sempre ignorados.
 - A janela de busca de disponibilidade é de **20 dias corridos**, incluindo hoje, no fuso da Califórnia. Se ela atravessar a virada do mês, a extensão lê o próximo mês no Presto e volta automaticamente para o mês que estava aberto.
 - A tela exibe somente as três primeiras vagas compatíveis. Quando houver outras, deve informar claramente a quantidade e listá-las em uma seção recolhível; cada vaga extra também pode ser marcada para entrar na mensagem confirmada. Elas não contam como dias indisponíveis.
-- Quando uma busca de disponibilidade for concluída sem vagas compatíveis, a mensagem confirmada pergunta perto do final quais dias e horários o cliente prefere, informando que a equipe tentará encontrar as opções mais próximas.
+- Quando uma busca de disponibilidade for concluída sem vagas compatíveis, a mensagem confirmada pergunta perto do final quais dias, período do dia e endereço o cliente prefere, informando que a equipe tentará encontrar as opções mais próximas. A confirmação de telefone só entra se o Yelp fornecer explicitamente um número do consumidor vinculado à lead.
 - O botão **Read visible schedule** abre visualmente cada card da agenda visível, aguarda o card selecionado carregar antes de extrair endereço/coordenadas e preço, e não altera nenhum dado no Presto. Em agendas grandes, essa leitura pode levar alguns minutos.
 - **Verbose debug** distingue explicitamente a captura da agenda do cálculo de disponibilidade. Antes de receber endereço e duração da lead, exibe `availability.status: not_calculated`, em vez de uma lista vazia que poderia ser interpretada como todos os dias disponíveis. Quando esses dados existirem, exibirá os dias sem disponibilidade e o motivo.
 - Valores exibidos pelo Presto usam formato localizado (por exemplo, `$ 180,00`) e são normalizados para dólares (`180`) antes de qualquer cálculo de duração operacional.

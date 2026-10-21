@@ -53,10 +53,19 @@
   }
   function noAvailabilityFollowUp(review) {
     if (review?.availabilitySearch?.compatibleTotal !== 0) return [];
-    return [
-      '✨ We do not currently have a compatible opening in the schedule.',
-      '🗓️ Could you please share your preferred days and times? We’ll do our best to find the closest available options.'
+    const details = [
+      'To help us find the best opening for you, please let us know:',
+      '',
+      '📅 Which day of the week works best',
+      '⏰ Whether you prefer morning or afternoon',
+      '📍 Your service address'
     ];
+    if (review?.lead?.phoneNumber) details.push('📞 And please confirm if this is the best phone number to use for your appointment');
+    details.push(
+      '',
+      'Once we have that information, we’ll check our schedule and send you the closest available options.'
+    );
+    return details;
   }
   function kacsMessage(review) {
     const quote = review.quote;
