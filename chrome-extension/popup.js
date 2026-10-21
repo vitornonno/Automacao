@@ -202,6 +202,196 @@ document.querySelector('#copy-presto-debug').addEventListener('click', async () 
     prestoStatusElement.textContent = 'Could not copy Presto debug.';
   }
 });
+
+const manualQuoteElement = document.querySelector('#manual-quote');
+const manualSummaryElement = document.querySelector('#manual-quote-summary');
+const manualAvailabilityElement = document.querySelector('#manual-availability');
+const manualFields = {
+  company: document.querySelector('#manual-company'), name: document.querySelector('#manual-name'),
+  service: document.querySelector('#manual-service'), squareFeet: document.querySelector('#manual-square-feet'),
+  bedrooms: document.querySelector('#manual-bedrooms'), bathrooms: document.querySelector('#manual-bathrooms'),
+  location: document.querySelector('#manual-location'), extraServices: document.querySelector('#manual-extra-services'),
+  products: document.querySelector('#manual-products')
+};
+let manualAvailability = null;
+let selectedManualAvailability = new Set();
+const MANUAL_DRAFT_KEY = 'manualQuoteDraft';
+
+function manualLead() {
+  const company = manualFields.company.value;
+  return {
+    id: `manual:${crypto.randomUUID()}`,
+    platform: 'manual',
+    companyName: company === 'kacs' ? 'KACS Cleaning Services' : "Jhey's Cleaning",
+    customerName: manualFields.name.value.trim() || null,
+    serviceType: CleaningQuoteEngine.SERVICES[manualFields.service.value],
+    squareFeet: manualFields.squareFeet.value.trim() || null,
+    bedrooms: manualFields.bedrooms.value.trim() || null,
+    bathrooms: manualFields.bathrooms.value.trim() || null,
+    location: manualFields.location.value.trim() || null,
+    extraServices: manualFields.extraServices.value.trim() || null,
+    cleaningProducts: manualFields.products.value.trim() || null
+  };
+}
+function manualQuote() { return CleaningQuoteEngine.calculateQuote(manualLead(), { companyOverride: manualFields.company.value }); }
+function manualDuration(quote) {
+  if (quote.estimatedHours) return Math.round(quote.estimatedHours.maximum * 60);
+  const hours = Number(quote.priceRange?.maximum || quote.amount || 0) / 100;
+  return Math.round(Math.ceil(hours * 2) / 2 * 60);
+}
+function manualClock(value) { const hour = Math.floor(value / 60); const minute = value % 60; return `${hour % 12 || 12}:${String(minute).padStart(2, '0')} ${hour >= 12 ? 'PM' : 'AM'}`; }
+function manualDate(value) { return new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date(`${value}T12:00:00`)); }
+function manualKey(item) { return `${item.day}|${item.start}`; }
+function manualPriceDuration(price, company) {
+  const hours = Number(price || 0) / 100;
+  return Math.round((company === 'kacs' ? CleaningQuoteEngine.roundToNearestHalfHour(hours) : Math.ceil(hours * 2) / 2) * 60);
+}
+function manualQuoteDescription(quote) {
+  if (quote.status === 'ready_for_review' && quote.estimatedHours) return `${quote.estimatedHours.minimum}–${quote.estimatedHours.maximum} hours · KACS hourly estimate`;
+  if (quote.status === 'ready_for_review') return `$${quote.priceRange.minimum}–$${quote.priceRange.maximum} · preliminary estimate`;
+  if (quote.status === 'missing_size') return 'Size details needed — a request-for-details message can still be copied.';
+  return quote.reason || 'Complete the details needed for this quote.';
+}
+function renderManualQuote() {
+  const quote = manualQuote();
+  manualSummaryElement.textContent = manualQuoteDescription(quote);
+  if (!manualAvailability) manualAvailabilityElement.innerHTML = '';
+  return quote;
+}
+function resetManualAvailability() {
+  manualAvailability = null;
+  selectedManualAvailability = new Set();
+  renderManualQuote();
+}
+async function saveManualDraft() {
+  const draft = Object.fromEntries(Object.entries(manualFields).map(([key, field]) => [key, field.value]));
+  await chrome.storage.local.set({ [MANUAL_DRAFT_KEY]: draft });
+}
+async function loadManualDraft() {
+  const stored = await chrome.storage.local.get(MANUAL_DRAFT_KEY);
+  const draft = stored[MANUAL_DRAFT_KEY];
+  if (!draft) return;
+  Object.entries(manualFields).forEach(([key, field]) => { if (typeof draft[key] === 'string') field.value = draft[key]; });
+}
+function manualRelay(message, timeoutMs = 15000) {
+  return Promise.race([
+    chrome.runtime.sendMessage(message),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('The route relay did not respond in time. Check the relay settings and try again.')), timeoutMs))
+  ]);
+}
+function manualSelectedSlots() {
+  if (!manualAvailability?.options) return [];
+  return manualAvailability.options.filter((slot) => selectedManualAvailability.has(manualKey(slot))).map((slot) => ({ day: slot.day, start: slot.start, duration: manualAvailability.duration }));
+}
+function renderManualAvailability() {
+  if (!manualAvailability) return;
+  if (manualAvailability.error) {
+    manualAvailabilityElement.innerHTML = `<p class="manual-availability-note">${escapeHtml(manualAvailability.error)}</p>`;
+    return;
+  }
+  if (!manualAvailability.options.length) {
+    manualAvailabilityElement.innerHTML = `<p class="manual-location-confirmed">Location confirmed: ${escapeHtml(manualAvailability.approximateLocation)}</p><p class="manual-availability-note">No compatible openings were found in the scanned schedule. The copied message will request the client’s preferred day and time.</p>`;
+    return;
+  }
+  manualAvailabilityElement.innerHTML = `<p class="manual-location-confirmed">Location confirmed: ${escapeHtml(manualAvailability.approximateLocation)}</p>${manualAvailability.options.map((slot) => {
+    const key = manualKey(slot);
+    return `<label class="manual-slot"><input type="checkbox" data-manual-availability="${escapeHtml(key)}" ${selectedManualAvailability.has(key) ? 'checked' : ''}><span><strong>${manualDate(slot.day)} · ${manualClock(slot.start)}–${manualClock(slot.start + 30)}</strong><small>Estimated end: ${manualClock(slot.start + manualAvailability.duration)}</small></span></label>`;
+  }).join('')}`;
+}
+async function manualRouteMinutes(origin, destination) {
+  const response = await manualRelay({ type: 'ROUTE_RELAY_REQUEST', request: { origin, destination } });
+  if (!response?.ok) throw new Error(response?.error || 'Route lookup failed.');
+  return Math.ceil(response.route.durationSeconds / 60);
+}
+async function findManualAvailability() {
+  const quote = manualQuote();
+  const lead = manualLead();
+  if (quote.status !== 'ready_for_review') throw new Error('Complete a supported service and home size before finding availability.');
+  if (!lead.location) throw new Error('Enter the service address or locality first.');
+  const saved = await chrome.storage.local.get(`prestoJobs:${quote.company}`);
+  const snapshot = saved[`prestoJobs:${quote.company}`];
+  if (!snapshot?.jobs?.length) throw new Error('Read this company’s Presto schedule first.');
+  const geocode = await manualRelay({ type: 'GEOCODE_RELAY_REQUEST', query: lead.location, region: 'california' });
+  if (!geocode?.ok) throw new Error(geocode?.error || 'Could not locate that address.');
+  const destination = geocode.location;
+  const duration = manualDuration(quote);
+  const byDay = Object.groupBy(snapshot.jobs, (job) => job.date);
+  const startDate = new Date(`${snapshot.range.start}T12:00:00Z`);
+  const endDate = new Date(`${snapshot.range.end}T12:00:00Z`);
+  const options = [];
+  const totalDays = Math.round((endDate - startDate) / 86400000) + 1;
+  let currentDay = 0;
+  for (let cursor = new Date(startDate); cursor <= endDate; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
+    currentDay += 1;
+    manualAvailabilityElement.innerHTML = `<p class="manual-location-confirmed">Location confirmed: ${escapeHtml(destination.label)}</p><p class="manual-availability-note">Calculating availability… ${currentDay} of ${totalDays} days checked.</p>`;
+    const day = cursor.toISOString().slice(0, 10);
+    if (new Date(`${day}T12:00:00`).getDay() === 0) continue;
+    const jobs = (byDay[day] || []).slice().sort((a, b) => String(a.startTime).localeCompare(String(b.startTime)));
+    if (jobs.some((job) => !job.coordinates || !Number.isFinite(job.price) || !job.startTime)) continue;
+    for (let index = 0; index <= jobs.length; index += 1) {
+      const previous = jobs[index - 1]; const next = jobs[index];
+      let start = 480;
+      if (previous) {
+        const [hour, minute] = previous.startTime.split(':').map(Number);
+        start = hour * 60 + minute + manualPriceDuration(previous.price, quote.company) + 30 + await manualRouteMinutes(previous.coordinates, destination);
+      }
+      start = Math.ceil(start / 30) * 30;
+      if (start + duration > 1140) continue;
+      if (next) {
+        const [hour, minute] = next.startTime.split(':').map(Number);
+        const arrival = start + duration + 30 + await manualRouteMinutes(destination, next.coordinates);
+        if (arrival > hour * 60 + minute) continue;
+      }
+      options.push({ day, start });
+      break;
+    }
+  }
+  manualAvailability = { options, duration, compatibleTotal: options.length, approximateLocation: destination.label };
+  selectedManualAvailability = new Set(options.slice(0, 3).map(manualKey));
+}
+
+document.querySelector('#manual-quote-toggle').addEventListener('click', () => {
+  manualQuoteElement.hidden = !manualQuoteElement.hidden;
+  if (!manualQuoteElement.hidden) renderManualQuote();
+});
+Object.values(manualFields).forEach((field) => {
+  const changed = () => { resetManualAvailability(); saveManualDraft(); };
+  field.addEventListener('input', changed);
+  field.addEventListener('change', changed);
+});
+manualAvailabilityElement.addEventListener('change', (event) => {
+  const key = event.target.dataset.manualAvailability;
+  if (!key) return;
+  if (event.target.checked) selectedManualAvailability.add(key); else selectedManualAvailability.delete(key);
+});
+document.querySelector('#manual-find-availability').addEventListener('click', async (event) => {
+  event.target.disabled = true;
+  manualAvailability = null;
+  manualAvailabilityElement.innerHTML = '<p class="manual-availability-note">Calculating availability…</p>';
+  try {
+    await findManualAvailability();
+  } catch (error) {
+    manualAvailability = { error: error.message || 'Could not calculate availability.' };
+  } finally {
+    renderManualAvailability();
+    event.target.disabled = false;
+  }
+});
+document.querySelector('#manual-copy-message').addEventListener('click', async () => {
+  const lead = manualLead(); const quote = manualQuote();
+  const review = {
+    id: lead.id, lead, quote, state: 'manual',
+    availability: manualSelectedSlots(),
+    availabilitySearch: manualAvailability && !manualAvailability.error ? { compatibleTotal: manualAvailability.compatibleTotal } : null
+  };
+  try {
+    await navigator.clipboard.writeText(CleaningQuoteMessages.approvedMessage(review));
+    manualSummaryElement.textContent = 'Quote message copied to clipboard.';
+  } catch {
+    manualSummaryElement.textContent = 'Could not copy the quote message.';
+  }
+});
 loadReviews();
 loadRelaySettings();
 loadLastPrestoScan();
+loadManualDraft().then(renderManualQuote);

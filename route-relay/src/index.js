@@ -50,6 +50,12 @@ export default {
       const geocodeUrl = new URL(MAPBOX_GEOCODE_URL);
       geocodeUrl.searchParams.set('q', query);
       geocodeUrl.searchParams.set('country', 'us');
+      if (input.region === 'california') {
+        // Both companies operate in California. Restrict ambiguous place names (for example,
+        // "Concord") to the state instead of accepting a same-named city elsewhere in the US.
+        geocodeUrl.searchParams.set('bbox', '-124.482003,32.528289,-114.131211,42.009518');
+        geocodeUrl.searchParams.set('proximity', '-121.9886,37.9780');
+      }
       geocodeUrl.searchParams.set('limit', '1');
       geocodeUrl.searchParams.set('access_token', env.MAPBOX_ACCESS_TOKEN);
       const response = await fetch(geocodeUrl);

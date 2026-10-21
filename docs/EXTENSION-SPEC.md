@@ -6,7 +6,7 @@ Extensão Chrome local para apoiar o atendimento de novas leads de empresas de l
 
 - A extensão **nunca envia** mensagens, altera leads ou agenda serviços. Ela lê o Presto somente quando o atendente aciona a leitura de agenda.
 - Ao confirmar uma cotação, o atendente recebe a mensagem imediatamente na área de transferência e a cola manualmente no Yelp.
-- Thumbtack e Quo/OpenPhone estão fora do escopo atual.
+- A leitura automática de leads continua limitada ao Yelp. Thumbtack, Quo/OpenPhone e qualquer outro site podem usar o modo **Manual quote**: o atendente insere os detalhes da lead, endereço/localidade e empresa para gerar a mesma mensagem e consultar disponibilidade da agenda Presto. A extensão não lê nem envia mensagens nesses sites.
 - Toda proposta exige revisão humana antes de ser usada.
 
 ## Empresas e origem das regras
@@ -89,6 +89,8 @@ Ao reabrir uma lead salva/aprovada/ajustada, não criar uma duplicata. O botão 
 - Se novos detalhes de produtos ou serviços adicionais estiverem mais completos do que o registro salvo, a extensão permite gerar uma versão corrigida.
 - Mudanças em metragem, quartos ou banheiros também permitem recalcular e confirmar uma versão atualizada.
 - Quando uma cotação já aprovada for alterada manualmente no painel (empresa, serviço, metragem, quartos ou banheiros), a extensão recalcula e atualiza imediatamente o registro e a mensagem da área de transferência. Como a duração pode mudar, quaisquer datas de disponibilidade anteriores são removidas até uma nova busca ser executada. Marcar ou desmarcar uma data compatível também atualiza a mensagem copiada.
+- Pelo popup da extensão, em qualquer site, **Manual quote** abre um formulário para empresa, cliente, tipo de serviço, dimensões, localidade/endereço e serviços adicionais. O botão **Find availability** geocodifica a localidade e combina a duração estimada com a agenda Presto já lida da empresa; as vagas marcadas entram na mensagem copiada. Sem vagas, a mensagem pede as preferências do cliente, seguindo a regra existente.
+- Como KACS e Jhey’s atendem somente a Califórnia, a busca de disponibilidade restringe a geocodificação manual a esse estado. A interface confirma o local resolvido antes de exibir vagas; uma busca ambígua como `Concord` deve confirmar uma localidade na Califórnia, nunca New Hampshire.
 - Para leads já aprovadas/ajustadas, os botões **Copy follow-up 1**, **2**, **3** e **4** leem o texto visível da conversa atual do Yelp e reconhecem individualmente os trechos característicos de cada modelo da empresa. Um modelo que já aparece na conversa fica bloqueado, mas não há sequência obrigatória: a pessoa escolhe o follow-up adequado à situação. Os botões apenas copiam; não enviam nem alteram o chat.
 
 ## Dados locais e privacidade

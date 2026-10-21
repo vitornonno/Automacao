@@ -8,7 +8,25 @@
   </head>
   <body>
     <main>
-      <header><h1>Approval queue</h1><div class="queue-tools"><button id="clear-queue" class="quiet" type="button">Clear queue</button><button id="refresh" title="Refresh">↻</button></div></header>
+      <header><h1>Approval queue</h1><div class="queue-tools"><button id="manual-quote-toggle" class="quiet" type="button">Manual quote</button><button id="clear-queue" class="quiet" type="button">Clear queue</button><button id="refresh" title="Refresh">↻</button></div></header>
+      <section id="manual-quote" class="manual-quote" hidden>
+        <h2>Manual quote</h2>
+        <p>Use this from Thumbtack or any other site. Enter the lead details, find availability, then copy the message to paste where you reply.</p>
+        <div class="manual-grid">
+          <label>Company<select id="manual-company"><option value="kacs">KACS Cleaning Services</option><option value="jheys">Jhey's Cleaning</option></select></label>
+          <label>Client name<input id="manual-name" type="text" placeholder="Optional"></label>
+          <label>Service<select id="manual-service"><option value="first_cleaning">First Cleaning / Regular home cleaning</option><option value="deep_cleaning">Deep Cleaning</option><option value="move_in_out">Move-In / Move-Out Cleaning</option><option value="monthly">Monthly Cleaning</option><option value="biweekly">Bi-weekly Cleaning</option><option value="post_construction">Post-Construction Cleaning</option></select></label>
+          <label>Square feet<input id="manual-square-feet" type="number" min="1" placeholder="Optional"></label>
+          <label>Bedrooms<input id="manual-bedrooms" type="number" min="0" step="1" placeholder="Optional"></label>
+          <label>Bathrooms<input id="manual-bathrooms" type="number" min="0" step="0.5" placeholder="Optional"></label>
+          <label class="manual-full">Service address or locality<input id="manual-location" type="text" placeholder="Street address, city, or ZIP code"></label>
+          <label class="manual-full">Additional services requested<input id="manual-extra-services" type="text" placeholder="Optional"></label>
+          <label class="manual-full">Cleaning products requested<input id="manual-products" type="text" placeholder="Optional"></label>
+        </div>
+        <p id="manual-quote-summary" class="manual-summary" aria-live="polite"></p>
+        <div class="manual-actions"><button id="manual-find-availability" type="button">Find availability</button><button id="manual-copy-message" class="quiet" type="button">Copy quote message</button></div>
+        <section id="manual-availability" aria-live="polite"></section>
+      </section>
       <nav aria-label="Review filters">
         <button class="filter active" data-filter="pending_human_approval">Pending</button>
         <button class="filter" data-filter="all">All</button>
@@ -32,6 +50,7 @@
         <small id="relay-status" aria-live="polite"></small>
       </details>
     </main>
+    <script src="pricing.js"></script>
     <script src="quote-messages.js"></script>
     <script src="popup.js"></script>
   </body>
