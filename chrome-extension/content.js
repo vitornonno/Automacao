@@ -477,7 +477,10 @@
         }
         const now = new Date().toISOString();
         const selectedSlots = selectedAvailabilitySlots() || [];
-        const review = { id: lead.id, lead, quote, availability: selectedSlots, state: 'approved', savedAt: now, updatedAt: now, url: location.href };
+        const availabilitySearch = availability?.status === 'ready'
+          ? { compatibleTotal: availability.compatibleTotal || 0 }
+          : null;
+        const review = { id: lead.id, lead, quote, availability: selectedSlots, availabilitySearch, state: 'approved', savedAt: now, updatedAt: now, url: location.href };
         await navigator.clipboard.writeText(CleaningQuoteMessages.approvedMessage(review));
         await chrome.storage.local.set({ [key]: review });
         existingReview = review;

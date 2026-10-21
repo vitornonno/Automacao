@@ -55,4 +55,6 @@ const jheysMissingSizeMessage = messages.approvedMessage({ lead: { customerName:
 check(jheysMissingSizeMessage.includes('Approximate square footage') && jheysMissingSizeMessage.includes('bedrooms and bathrooms'), 'Jhey’s missing-size lead should request home details');
 const undecidedExtraServicesMessage = messages.approvedMessage({ lead: { extraServices: 'Not sure' }, quote: { company: 'jheys', serviceLabel: 'First Cleaning', amount: 250 } });
 check(!undecidedExtraServicesMessage.includes('Additional Services Requested'), 'Unspecified additional services should not appear in the message');
+const noAvailabilityMessage = messages.approvedMessage({ availabilitySearch: { compatibleTotal: 0 }, lead: { customerName: 'Sample' }, quote: { company: 'kacs', service: 'first_cleaning', serviceLabel: 'First Cleaning', estimatedHours: { minimum: 2, maximum: 3.5 } } });
+check(noAvailabilityMessage.includes('preferred days and times') && noAvailabilityMessage.includes('closest available options'), 'No compatible availability should ask for the client’s preferred days and times');
 console.log('Pricing logic checks passed.');

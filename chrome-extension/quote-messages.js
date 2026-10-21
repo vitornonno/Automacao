@@ -51,6 +51,13 @@
     };
     return ['📅 Current availability:', '', ...slots.map((slot) => `• ${date(slot.day)} | Arrival window: ${time(slot.start)}–${time(slot.start + 30)}`)];
   }
+  function noAvailabilityFollowUp(review) {
+    if (review?.availabilitySearch?.compatibleTotal !== 0) return [];
+    return [
+      '✨ We do not currently have a compatible opening in the schedule.',
+      '🗓️ Could you please share your preferred days and times? We’ll do our best to find the closest available options.'
+    ];
+  }
   function kacsMessage(review) {
     const quote = review.quote;
     const lead = review.lead || {};
@@ -73,6 +80,8 @@
     if (limitations.length) message.push('', ...separatedParagraphs(limitations));
     const availability = selectedAvailability(review);
     if (availability.length) message.push('', ...availability);
+    const noAvailability = noAvailabilityFollowUp(review);
+    if (noAvailability.length) message.push('', ...noAvailability);
     message.push('', 'Please let us know if you have any questions or would like to discuss the next steps.', '', 'KACS Cleaning Services LLC', '🌐 www.kacscleaning.com', '📞 (925) 438-0657');
     return message.join('\n');
   }
@@ -143,6 +152,7 @@
       '',
       'This first visit provides a thorough foundation, allowing future appointments to be more efficient, consistent, and budget-friendly.',
       'Upon arrival, our team will complete a quick walkthrough to confirm the scope of work and final price before beginning.',
+      ...(noAvailabilityFollowUp(review).length ? ['', ...noAvailabilityFollowUp(review)] : []),
       '',
       'Please let us know if you would like to proceed or have any questions.',
       '',
