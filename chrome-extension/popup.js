@@ -43,6 +43,20 @@ function renderPrestoDebug(response) {
   };
   prestoDebugOutput.textContent = JSON.stringify(prestoDebug, null, 2);
 }
+function prestoStatus(response, restored = false) {
+  const withCoordinates = (response.jobs || []).filter((job) => job.coordinates).length;
+  const prefix = restored ? 'Last saved scan — ' : '';
+  prestoStatusElement.textContent = `${prefix}${response.company?.name || 'Presto'}: ${(response.jobs || []).length} visible jobs read; ${withCoordinates} with route coordinates.`;
+}
+async function loadLastPrestoScan() {
+  const snapshots = await chrome.storage.local.get(['prestoJobs:kacs', 'prestoJobs:jheys']);
+  const latest = Object.values(snapshots)
+    .filter((snapshot) => snapshot?.capturedAt && Array.isArray(snapshot.jobs))
+    .sort((a, b) => new Date(b.capturedAt) - new Date(a.capturedAt))[0];
+  if (!latest) return;
+  renderPrestoDebug(latest);
+  prestoStatus(latest, true);
+}
 function result(review) {
   const quote = review.quote;
   if (quote.quoteType === 'time_only' && quote.estimatedHours) return `${quote.estimatedHours.minimum}–${quote.estimatedHours.maximum} hours`;
@@ -153,8 +167,7 @@ document.querySelector('#scan-presto').addEventListener('click', async (event) =
     if (!response.company?.key) throw new Error(`Company not recognized${response.company?.name ? `: ${response.company.name}` : ''}.`);
     await chrome.storage.local.set({ [`prestoJobs:${response.company.key}`]: response });
     renderPrestoDebug(response);
-    const withCoordinates = response.jobs.filter((job) => job.coordinates).length;
-    prestoStatusElement.textContent = `${response.company.name}: ${response.jobs.length} visible jobs read; ${withCoordinates} with route coordinates.`;
+    prestoStatus(response);
   } catch (error) {
     prestoStatusElement.textContent = error.message || 'Could not read job details.';
   } finally {
@@ -172,3 +185,4 @@ document.querySelector('#copy-presto-debug').addEventListener('click', async () 
 });
 loadReviews();
 loadRelaySettings();
+loadLastPrestoScan();

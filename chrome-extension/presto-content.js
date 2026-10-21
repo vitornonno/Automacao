@@ -215,7 +215,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   if (message.type === 'SCAN_PRESTO_JOBS') {
     const company = detectedCompany();
-    jobSnapshot().then(({ jobs, debug }) => sendResponse({ ok: true, source: 'presto_job_cards_dom', capturedAt: new Date().toISOString(), company, jobs, debug, range: { start: todayInCalifornia(), end: availabilityEndDate() } }))
+    jobSnapshot().then(async ({ jobs, debug }) => {
+      const response = { ok: true, source: 'presto_job_cards_dom', capturedAt: new Date().toISOString(), company, jobs, debug, range: { start: todayInCalifornia(), end: availabilityEndDate() } };
+      // Store from the Presto page so a completed scan survives closing the extension popup.
+      if (company.key) await chrome.storage.local.set({ [`prestoJobs:${company.key}`]: response });
+      sendResponse(response);
+    })
       .catch((error) => sendResponse({ ok: false, error: error.message || 'Could not scan job cards.' }));
     return true;
   }
