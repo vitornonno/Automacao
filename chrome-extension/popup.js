@@ -117,6 +117,24 @@ document.querySelector('#save-relay').addEventListener('click', async () => {
   await chrome.storage.local.set({ routeRelay: { url, token } });
   relayStatusElement.textContent = 'Relay configuration saved locally.';
 });
+document.querySelector('#toggle-relay-token').addEventListener('click', (event) => {
+  const hidden = relayTokenElement.type === 'password';
+  relayTokenElement.type = hidden ? 'text' : 'password';
+  event.target.textContent = hidden ? 'Hide token' : 'Show token';
+});
+document.querySelector('#copy-relay-token').addEventListener('click', async () => {
+  const token = relayTokenElement.value;
+  if (!token) {
+    relayStatusElement.textContent = 'No token is saved in this Chrome profile.';
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(token);
+    relayStatusElement.textContent = 'Extension token copied to clipboard.';
+  } catch {
+    relayStatusElement.textContent = 'Could not copy the extension token.';
+  }
+});
 document.querySelector('#test-relay').addEventListener('click', async (event) => {
   event.target.disabled = true;
   relayStatusElement.textContent = 'Testing…';

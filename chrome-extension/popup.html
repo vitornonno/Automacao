@@ -27,6 +27,7 @@
         <p>Stores only the relay URL and extension token locally. Your Mapbox token remains in Cloudflare.</p>
         <label>Relay URL<input id="relay-url" type="url" placeholder="https://…workers.dev"></label>
         <label>Extension token<input id="relay-token" type="password" autocomplete="off"></label>
+        <div><button id="toggle-relay-token" class="quiet" type="button">Show token</button><button id="copy-relay-token" class="quiet" type="button">Copy token</button></div>
         <div><button id="save-relay" type="button">Save</button><button id="test-relay" class="quiet" type="button">Test routes</button></div>
         <small id="relay-status" aria-live="polite"></small>
       </details>
