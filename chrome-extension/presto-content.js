@@ -6,8 +6,15 @@ function text(element) {
 }
 
 function timeFromEvent(element) {
-  const match = text(element).match(/\b([01]?\d|2[0-3]):[0-5]\d\b/);
-  return match ? match[0] : null;
+  const match = text(element).match(/\b(\d{1,2}):([0-5]\d)\s*(am|pm)\b/i);
+  if (!match) return null;
+  let hour = Number(match[1]) % 12;
+  if (match[3].toLowerCase() === 'pm') hour += 12;
+  return `${String(hour).padStart(2, '0')}:${match[2]}`;
+}
+
+function customerNameFromEvent(element) {
+  return text(element).replace(/^\d{1,2}:[0-5]\d\s*(?:am|pm)\s*/i, '').trim() || null;
 }
 
 function todayInCalifornia() {
@@ -49,7 +56,7 @@ function calendarSnapshot() {
     const id = event.id.replace(/^event-/, '');
     const eventText = text(event);
     const time = timeFromEvent(event);
-    const customerName = eventText.replace(/^([01]?\d|2[0-3]):[0-5]\d\s*/, '').trim() || null;
+    const customerName = customerNameFromEvent(event);
     const jobs = days.get(day) || [];
     jobs.push({ id, time, customerName });
     days.set(day, jobs);
@@ -68,7 +75,7 @@ function visibleEvents() {
       date: element.closest('[data-date]')?.dataset.date || null,
       id: element.id.replace(/^event-/, ''),
       time: timeFromEvent(element),
-      customerName: text(element).replace(/^([01]?\d|2[0-3]):[0-5]\d\s*/, '').trim() || null
+      customerName: customerNameFromEvent(element)
     }))
     .filter((event) => isAvailabilityDate(event.date))
     .sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`));
@@ -93,12 +100,20 @@ function moneyValue(value) {
   return Number.isFinite(amount) ? amount : null;
 }
 
-function selectedJobDetails() {
-  const mapLink = [...document.querySelectorAll('a[href*="maps.google.com"]')]
+function openedServiceCard() {
+  const activeCard = document.querySelector('.v-menu__content.menuable__content__active .secondary-card');
+  if (activeCard?.querySelector('.service-card-header')) return activeCard;
+  return [...document.querySelectorAll('.secondary-card')]
+    .find((card) => card.querySelector('.service-card-header')) || null;
+}
+
+function selectedJobDetails(card) {
+  const mapLink = [...card.querySelectorAll('a[href*="maps.google.com"]')]
     .find((item) => /[?&]q=-?\d/.test(item.href));
-  const coordinates = coordinatesFromMapLink();
+  const match = mapLink?.href.match(/[?&]q=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/);
+  const coordinates = match ? { latitude: Number(match[1]), longitude: Number(match[2]), link: mapLink.href } : null;
   const locationRow = mapLink?.closest('.card-info-row');
-  const priceMatch = document.body.innerText.match(/Price:\s*\$\s*([\d,.]+)/i);
+  const priceMatch = text(card).match(/pre[cç]o:\s*\$\s*([\d,.]+)/i);
   return {
     address: text(locationRow?.querySelector('.card-info-column-text')) || null,
     coordinates,
@@ -159,8 +174,7 @@ async function waitForCardToOpen(eventId, timeoutMilliseconds = 3000) {
   while (Date.now() - startedAt < timeoutMilliseconds) {
     const event = document.getElementById(`event-${eventId}`);
     const selected = event?.closest('.v-event')?.classList.contains('selected-event');
-    const hasMap = Boolean(document.querySelector('a[href*="maps.google.com?q="]'));
-    if (selected && hasMap) return true;
+    if (selected && openedServiceCard()) return true;
     await sleep(100);
   }
   return false;
@@ -174,7 +188,7 @@ async function visibleJobSnapshot(debug) {
     liveEvent.click();
     const loaded = await waitForCardToOpen(event.id);
     if (loaded) await sleep(900);
-    const details = loaded ? selectedJobDetails() : { address: null, coordinates: null, price: null };
+    const details = loaded ? selectedJobDetails(openedServiceCard()) : { address: null, coordinates: null, price: null };
     debugEvent(debug, loaded ? 'Job card captured' : 'Job card timed out', { id: event.id, loaded, hasCoordinates: Boolean(details.coordinates), hasPrice: Number.isFinite(details.price) });
     jobs.push({
       id: event.id,
