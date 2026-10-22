@@ -137,7 +137,7 @@
     if (/\bkacs\b|kacs cleaning services/i.test(companyName || '')) return 'kacs';
     if (/jhey['’]?s cleaning/i.test(companyName || '')) return 'jheys';
     if (/da\s*silva\s+cleaning/i.test(companyName || '')) return 'dasilva';
-    if (/gleam\s+team\s+housecleaning/i.test(companyName || '')) return 'gleam';
+    if (/\bgleam\s+team(?:\s+housecleaning)?\b/i.test(companyName || '')) return 'gleam';
     if (/express\s+house\s+cleaning/i.test(companyName || '')) return 'express';
     return 'unknown';
   }

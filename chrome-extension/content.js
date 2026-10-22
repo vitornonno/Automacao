@@ -367,6 +367,13 @@
   function followUpButtons() {
     if (!canCopyApprovedMessage()) return '<button disabled>Copy follow-up</button>';
     const followUps = CleaningQuoteMessages.followUpStatus(quote.company, lead, conversationText());
+    if (!Array.isArray(followUps)) {
+      const suggestion = followUps.suggestedSituation
+        ? `<small>Suggested from this chat: Situation ${followUps.suggestedSituation}. Confirm whether the client replied before choosing Situation 1 or 3.</small>`
+        : '<small>Review the chat and select the matching situation before copying a follow-up.</small>';
+      const situations = followUps.situations.map((situation) => `<details class="details-request" ${situation.number === followUps.suggestedSituation ? 'open' : ''}><summary><strong>Situation ${situation.number}: ${escapeHtml(situation.title)}</strong></summary><small>${escapeHtml(situation.signals)}</small><div>${situation.messages.map((item) => `<button data-action="copy-follow-up" data-follow-up-situation="${situation.number}" data-follow-up-stage="${item.stage}" ${item.sent ? 'disabled' : ''}>${item.sent ? `Follow-up ${item.stage} sent` : `Copy follow-up ${item.stage}`}</button>`).join('')}</div></details>`).join('');
+      return `<section class="details-request follow-up-situations"><strong>Follow-up situations</strong>${suggestion}${situations}</section><button data-action="copy-archiving">Copy archiving</button>`;
+    }
     const buttons = followUps.map((followUp) => `<button data-action="copy-follow-up" data-follow-up-number="${followUp.number}" ${followUp.sent ? 'disabled' : ''}>${followUp.sent ? `Follow-up ${followUp.number} sent` : `Copy follow-up ${followUp.number}`}</button>`).join('');
     return `${buttons}<button data-action="copy-archiving">Copy archiving</button>`;
   }
@@ -523,15 +530,21 @@
       render();
     }
     if (action === 'copy-follow-up' && canCopyApprovedMessage()) {
+      const status = CleaningQuoteMessages.followUpStatus(quote.company, lead, conversationText());
       const number = Number(event.target.dataset.followUpNumber);
-      const followUp = CleaningQuoteMessages.followUpStatus(quote.company, lead, conversationText()).find((item) => item.number === number);
+      const situation = Number(event.target.dataset.followUpSituation);
+      const stage = Number(event.target.dataset.followUpStage);
+      const followUp = Array.isArray(status)
+        ? status.find((item) => item.number === number)
+        : status.situations.find((item) => item.number === situation)?.messages.find((item) => item.stage === stage);
       if (!followUp || followUp.sent) {
         confirmationFeedback = 'This follow-up already appears in this Yelp conversation.';
         logDebug('Follow-up not copied', { company: quote.company, number, reason: 'already_detected' });
       } else try {
         await navigator.clipboard.writeText(followUp.message);
-        confirmationFeedback = `Follow-up ${followUp.number} copied to clipboard. Review it, then paste it into Yelp when ready.`;
-        logDebug('Follow-up copied', { company: quote.company, number: followUp.number });
+        const label = Array.isArray(status) ? `Follow-up ${followUp.number}` : `Situation ${situation}, follow-up ${stage}`;
+        confirmationFeedback = `${label} copied to clipboard. Review it, then paste it into Yelp when ready.`;
+        logDebug('Follow-up copied', { company: quote.company, number: followUp.number || stage, situation: situation || null });
       } catch {
         confirmationFeedback = 'Could not copy the follow-up.';
       }

@@ -33,6 +33,7 @@ check(quote.service === 'move_in' && quote.amount === 310 && quote.discount?.per
 quote = engine.calculateQuote({ companyName: 'Gleam Team Housecleaning', bedrooms: 3, bathrooms: 2, serviceType: 'Move-Out Cleaning' });
 check(quote.service === 'move_out' && quote.amount === 410 && !quote.discount, 'Gleam Move-Out must remain separate and must not receive the discount');
 check(engine.resolveCompany('Da Silva Cleaning Services') === 'dasilva' && engine.resolveCompany('Express House Cleaning') === 'express', 'New company names must be auto-detected');
+check(engine.resolveCompany('Gleam Team') === 'gleam' && engine.resolveCompany('DaSilva Cleaning') === 'dasilva', 'Yelp short business names must be auto-detected');
 check(engine.resolveService('Regular home cleaning', 'Once') === 'first_cleaning', 'One-time regular cleaning should map to First Cleaning');
 check(engine.resolveService('Regular home cleaning', 'Biweekly') === 'first_cleaning', 'Recurring new leads should start with First Cleaning');
 check(engine.resolveService('Regular home cleaning', 'Weekly') === 'first_cleaning', 'Weekly new leads should start with First Cleaning');
@@ -44,6 +45,7 @@ check(yelpLead?.companyName === 'KACS Cleaning Services' && yelpLead.bedrooms &&
 check(extractor.firstName('Adrienne M.') === 'Adrienne', 'Only the first customer name should be used');
 check(extractor.yelpBusinessNameFromText('Jhey’s Cleaning Services\nMy Leads') === 'Jhey’s Cleaning Services', 'Jhey’s Yelp DOM business name should be detected');
 check(extractor.yelpBusinessNameFromText('KACS Cleaning Services LLC') === 'KACS Cleaning Services', 'KACS Yelp DOM business name should be detected');
+check(extractor.yelpBusinessNameFromText('Gleam Team\nMy Leads') === 'Gleam Team Housecleaning' && extractor.yelpBusinessNameFromText('DaSilva Cleaning') === 'Da Silva Cleaning Services', 'Yelp short business names should resolve to their configured companies');
 check(extractor.squareFeetFromText('We have a townhome about 2000 sq ft.') === '2000', 'Yelp details should recognize square footage written before the unit');
 check(extractor.surveyAnswer({ surveyQuestionAnswers: [{ question: 'Do you require any of these cleaning product types?', answers: ['Eco-friendly or green', 'Non-toxic', 'Pet-safe'] }] }, /cleaning product types/i) === 'Eco-friendly or green, Non-toxic, Pet-safe', 'All Yelp multi-select answers should be retained');
 check(engine.calculateQuote(yelpLead).service === 'first_cleaning', 'The saved Yelp example should resolve Regular home cleaning / Once');
@@ -92,6 +94,12 @@ followUps = messages.followUpStatus('kacs', { customerName: 'Sample' }, "I just 
 check(followUps[0].sent, 'KACS no-phone follow-up 1 should be detected as already sent');
 followUps = messages.followUpStatus('jheys', { customerName: 'Sample' }, 'I wanted to check whether you are still considering options for your home cleaning. I wanted to follow up once more regarding the estimate we shared with you.');
 check(followUps[0].sent && !followUps[1].sent && followUps[2].sent && !followUps[3].sent && followUps[0].message.includes('this is Frank following up.') && followUps[1].message.includes('Frank from Jhey’s Cleaning once again.') && followUps[2].message.includes('Frank from Jhey’s Cleaning.') && followUps[3].message.includes("Frank from Jhey's Cleaning"), 'Jhey’s follow-ups should identify Frank and detect each already-sent situation independently');
+const daSilvaFollowUps = messages.followUpStatus('dasilva', { customerName: 'Sample' }, 'Estimated Price: $250–$350');
+check(daSilvaFollowUps.situations.length === 4 && daSilvaFollowUps.situations.every((situation) => situation.messages.length === 3) && daSilvaFollowUps.suggestedSituation === 1, 'Da Silva must offer three follow-ups for each of its four chat situations');
+const gleamFollowUps = messages.followUpStatus('gleam', { customerName: 'Sample' }, 'Please share the approximate square footage and photos of the main areas.');
+check(gleamFollowUps.suggestedSituation === 2 && gleamFollowUps.situations[1].messages[0].message.includes('walkthrough video'), 'Gleam must identify a details-request chat and retain its situation-specific script');
+const expressFollowUps = messages.followUpStatus('express', { customerName: 'Sample' }, 'Approximate square footage\nEstimated price: $200–$300');
+check(expressFollowUps.suggestedSituation === 4 && expressFollowUps.situations[3].messages[2].message.includes('plans have changed'), 'Express must identify a quote that followed requested details and retain all follow-up stages');
 check(messages.archivingMessage('kacs', { customerName: 'Sample' }).includes('Hi Sample!') && messages.archivingMessage('kacs', { customerName: 'Sample' }).includes('(925) 438-0657'), 'KACS archiving message should use the configured client greeting and contact details');
 check(messages.archivingMessage('jheys', { customerName: 'Sample' }).includes("Hi Sample, thank you again for reaching out to Jhey's Cleaning.") && messages.archivingMessage('jheys', { customerName: 'Sample' }).includes('(925) 515-5090'), 'Jhey’s archiving message should use the configured client greeting and contact details');
 console.log('Pricing logic checks passed.');

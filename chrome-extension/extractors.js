@@ -79,8 +79,8 @@
     const source = String(value || '');
     if (/jhey['’]s\s+cleaning(?:\s+services)?/i.test(source)) return 'Jhey’s Cleaning Services';
     if (/\bkacs\s+cleaning(?:\s+services)?/i.test(source)) return 'KACS Cleaning Services';
-    if (/da\s*silva\s+cleaning(?:\s+services)?/i.test(source)) return 'Da Silva Cleaning Services';
-    if (/gleam\s+team\s+housecleaning/i.test(source)) return 'Gleam Team Housecleaning';
+    if (/\bda\s*silva\s+cleaning(?:\s+services)?\b/i.test(source)) return 'Da Silva Cleaning Services';
+    if (/\bgleam\s+team(?:\s+housecleaning)?\b/i.test(source)) return 'Gleam Team Housecleaning';
     if (/express\s+house\s+cleaning/i.test(source)) return 'Express House Cleaning';
     return null;
   }

@@ -47,6 +47,10 @@
 #cleaning-quote-assistant dl div { display: flex; justify-content: space-between; gap: 8px; }
 #cleaning-quote-assistant dt { color: #566477; } #cleaning-quote-assistant dd { margin: 0; text-align: right; }
 #cleaning-quote-assistant footer { display: flex; flex-wrap: wrap; gap: 8px; border-top: 1px solid #e4e9f0; }
+#cleaning-quote-assistant footer .follow-up-situations { flex: 1 0 100%; padding: 0; border: 0; }
+#cleaning-quote-assistant .follow-up-situations > details { margin-top: 8px; padding: 8px; border: 1px solid #eadcb7; border-radius: 5px; background: #fffdf7; }
+#cleaning-quote-assistant .follow-up-situations summary { cursor: pointer; }
+#cleaning-quote-assistant .follow-up-situations details > div { grid-template-columns: repeat(3, 1fr); }
 #cleaning-quote-assistant footer button { flex: 1 1 150px; padding: 8px; border: 1px solid #2457a6; border-radius: 5px; color: #2457a6; background: #fff; cursor: pointer; font-weight: 700; }
 #cleaning-quote-assistant footer button:last-child { color: #fff; background: #2457a6; } #cleaning-quote-assistant button:disabled { opacity: .5; cursor: not-allowed; }
 #cleaning-quote-assistant .queue-list { display: grid; gap: 10px; max-height: 500px; overflow-y: auto; }
