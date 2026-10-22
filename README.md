@@ -5,7 +5,6 @@ Uma extensão local do Chrome para ajudar equipes de limpeza a revisar leads do 
 ## O que ela faz
 
 - Lê uma lead individual do Yelp e extrai dados como serviço, metragem, quartos, banheiros e solicitações adicionais.
-- Aplica as regras independentes de cotação para KACS e Jhey’s Cleaning.
 - Prepara mensagens em inglês para revisão humana e copia a versão aprovada para a área de transferência.
 - Lê a agenda do Presto somente em modo de consulta e calcula vagas compatíveis com duração, trânsito e margem operacional.
 - Mantém confirmações e snapshots locais no perfil do Chrome; nunca envia uma mensagem ou altera uma agenda automaticamente.
