@@ -49,6 +49,9 @@ function detectedCompany() {
   const normalized = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   if (/\bkacs\b/.test(normalized)) return { key: 'kacs', name };
   if (/\bjhey.?s\b/.test(normalized)) return { key: 'jheys', name };
+  if (/da\s*silva\s+cleaning/.test(normalized)) return { key: 'dasilva', name };
+  if (/gleam\s+team\s+housecleaning/.test(normalized)) return { key: 'gleam', name };
+  if (/express\s+house\s+cleaning/.test(normalized)) return { key: 'express', name };
   return { key: null, name: name || null };
 }
 

@@ -306,7 +306,7 @@
     if (availability?.status === 'loading') return '<section class="result"><p><strong>Calculating availability…</strong></p></section>';
     if (availability?.status === 'error') return `<section class="result"><p><strong>Availability unavailable</strong><small>${escapeHtml(availability.error)}</small></p></section>`;
     if (availability?.status === 'ready') {
-      const company = quote.company === 'kacs' ? 'KACS Cleaning Services' : "Jhey's Cleaning";
+      const company = CleaningQuoteEngine.COMPANIES[quote.company]?.name || 'Selected company';
       const slot = (item, index) => {
         const key = availabilityKey(item);
         return `<article class="availability-slot ${selectedAvailability.has(key) ? 'is-selected' : ''}"><label class="availability-slot-top"><input type="checkbox" data-availability-key="${escapeHtml(key)}" ${selectedAvailability.has(key) ? 'checked' : ''}><span class="availability-rank">${index + 1}</span><strong>${availabilityDay(item.day)}</strong><span class="availability-time"><span class="availability-window-label">Arrival window</span><span class="availability-window">${clock(item.start)}–${clock(item.start + 30)}</span></span></label><div class="availability-end">Estimated end: <strong>${clock(item.start + availability.duration)}</strong>${item.cleaner ? ` · Team: <strong>${escapeHtml(item.cleaner)}</strong>` : ''}</div>${availabilityContext(item)}</article>`;
@@ -320,7 +320,7 @@
     return '';
   }
   function canSaveForApproval(result) {
-    return result.status === 'ready_for_review' || (['kacs', 'jheys'].includes(result.company) && result.status === 'missing_size');
+    return result.status === 'ready_for_review' || (Object.hasOwn(CleaningQuoteEngine.COMPANIES, result.company) && result.status === 'missing_size');
   }
   function reviewHasWrongCompany(review) {
     return Boolean(review?.quote?.company && quote?.company && review.quote.company !== quote.company);
@@ -348,10 +348,17 @@
     return String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]);
   }
   function serviceSelector(value) {
-    const current = CleaningQuoteEngine.resolveService(value, lead.frequency) || '';
-    const options = Object.entries(CleaningQuoteEngine.SERVICES).filter(([id]) => CleaningQuoteEngine.INITIAL_LEAD_SERVICE_IDS.includes(id))
+    const normalized = CleaningQuoteEngine.normalizeService(value);
+    const current = quote?.company === 'gleam' && ['move_in', 'move_out'].includes(normalized)
+      ? normalized
+      : CleaningQuoteEngine.resolveService(value, lead.frequency) || '';
+    const availableServices = quote?.company === 'gleam'
+      ? [...CleaningQuoteEngine.INITIAL_LEAD_SERVICE_IDS, 'move_in', 'move_out']
+      : CleaningQuoteEngine.INITIAL_LEAD_SERVICE_IDS;
+    const options = Object.entries(CleaningQuoteEngine.SERVICES).filter(([id]) => availableServices.includes(id))
       .map(([id, label]) => `<option value="${id}" ${id === current ? 'selected' : ''}>${label}</option>`).join('');
-    return `<label>Cleaning type<select data-field="serviceType"><option value="">Select cleaning type</option>${options}</select></label>`;
+    const gleamMoveNote = quote?.company === 'gleam' && current === 'move_in_out' ? '<small>For Gleam, select Move-in or Move-out before quoting. The 15% discount applies only to Move-in.</small>' : '';
+    return `<label>Cleaning type<select data-field="serviceType"><option value="">Select cleaning type</option>${options}</select>${gleamMoveNote}</label>`;
   }
   function conversationText() {
     const conversation = document.querySelector('main') || document.body;
@@ -404,7 +411,7 @@
         <header><span>Lead estimate</span><div><button data-action="debug" aria-label="Verbose debug">Debug</button><button data-action="close" aria-label="Close">×</button></div></header>
       <section class="lead-fields">
         ${input('Company name', lead.companyName, 'companyName')}
-        <label>Company pricing<select data-field="companyOverride"><option value="">Auto-detect</option><option value="kacs" ${companyOverride === 'kacs' ? 'selected' : ''}>KACS</option><option value="jheys" ${companyOverride === 'jheys' ? 'selected' : ''}>Jhey's Cleaning</option></select></label>
+        <label>Company pricing<select data-field="companyOverride"><option value="">Auto-detect</option>${Object.entries(CleaningQuoteEngine.COMPANIES).map(([key, company]) => `<option value="${key}" ${companyOverride === key ? 'selected' : ''}>${escapeHtml(company.name)}</option>`).join('')}</select></label>
         ${serviceSelector(lead.serviceType)}
         ${input('Square feet', lead.squareFeet, 'squareFeet', 'number')}
         ${input('Bedrooms', lead.bedrooms, 'bedrooms', 'number')}
@@ -423,7 +430,7 @@
       const result = itemQuote.quoteType === 'time_only' && itemQuote.estimatedHours
         ? `${itemQuote.estimatedHours.minimum}–${itemQuote.estimatedHours.maximum} hours`
         : itemQuote.quoteType === 'fixed_price' ? `$${itemQuote.priceRange?.minimum ?? itemQuote.amount}–$${itemQuote.priceRange?.maximum ?? itemQuote.amount}` : 'Manual review required';
-      const company = itemQuote.company === 'kacs' ? 'KACS' : "Jhey's Cleaning";
+      const company = CleaningQuoteEngine.COMPANIES[itemQuote.company]?.name || 'Unknown company';
       const customerName = review.lead?.customerName || 'Client name unavailable';
       const actions = review.state === 'pending_human_approval'
         ? `<div class="queue-actions"><button data-review-state="approved">Approve</button><button data-review-state="adjusted">Adjust</button><button class="quiet" data-review-state="discarded">Discard</button></div>` : '';

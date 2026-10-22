@@ -13,6 +13,14 @@
     post_construction: 'Post-Construction Cleaning',
     move_in_out: 'Move-In / Move-Out Cleaning'
   };
+  const COMPANIES = {
+    kacs: { name: 'KACS Cleaning Services' },
+    jheys: { name: 'Jhey’s Cleaning' },
+    dasilva: { name: 'Da Silva Cleaning Services' },
+    gleam: { name: 'Gleam Team Housecleaning' },
+    express: { name: 'Express House Cleaning' }
+  };
+  const JHEYS_STYLE_COMPANIES = new Set(['jheys', 'dasilva', 'gleam', 'express']);
 
   const KACS_HOURS = {
     800: [2, 2, 2.5, 3, 1.5, 1.5, 3],
@@ -125,15 +133,23 @@
   }
 
   function resolveCompany(companyName, override) {
-    if (override === 'kacs' || override === 'jheys') return override;
+    if (Object.hasOwn(COMPANIES, override)) return override;
     if (/\bkacs\b|kacs cleaning services/i.test(companyName || '')) return 'kacs';
     if (/jhey['’]?s cleaning/i.test(companyName || '')) return 'jheys';
+    if (/da\s*silva\s+cleaning/i.test(companyName || '')) return 'dasilva';
+    if (/gleam\s+team\s+housecleaning/i.test(companyName || '')) return 'gleam';
+    if (/express\s+house\s+cleaning/i.test(companyName || '')) return 'express';
     return 'unknown';
   }
 
   function calculateQuote(lead, options = {}) {
     const company = resolveCompany(lead.companyName, options.companyOverride || lead.companyOverride);
-    const service = resolveService(lead.serviceType, lead.frequency);
+    const requestedService = normalizeService(lead.serviceType);
+    // Only Gleam needs the operational distinction between Move-In and Move-Out:
+    // Yelp sends them as one request, so the attendant must select the correct one.
+    const service = company === 'gleam' && ['move_in', 'move_out'].includes(requestedService)
+      ? requestedService
+      : resolveService(lead.serviceType, lead.frequency);
     const size = chooseSizeBand(lead);
     const base = {
       company,
@@ -146,7 +162,7 @@
     };
 
     if (!service) return { ...base, status: 'missing_service', reason: 'No supported cleaning type was found.' };
-    if (company === 'unknown') return { ...base, status: 'manual_company_required', reason: 'Select KACS or Jhey\'s Cleaning before calculating.' };
+    if (company === 'unknown') return { ...base, status: 'manual_company_required', reason: 'Select a supported company before calculating.' };
     if (size.status === 'missing_size') return { ...base, status: 'missing_size', reason: 'No usable square footage or bedroom/bathroom match was found.' };
 
     if (company === 'kacs') {
@@ -172,13 +188,18 @@
 
     if (size.status === 'over_limit') return { ...base, status: 'manual_quote_required', reason: 'Homes above 3,000 sq. ft. require a human quote.' };
       const moveInOut = service === 'move_in_out';
-      const amount = moveInOut
+      const baseAmount = moveInOut
         ? Math.round((BEGINNER_PRICES[size.band][SERVICE_INDEX.indexOf('move_in')] + BEGINNER_PRICES[size.band][SERVICE_INDEX.indexOf('move_out')]) / 2)
         : BEGINNER_PRICES[size.band][SERVICE_INDEX.indexOf(service)];
+      // Move-in and Move-out share the preliminary combined quote, but Gleam's
+      // discount is offered only when the customer specifically requested Move-in.
+      const gleamDiscountApplies = company === 'gleam' && ['first_cleaning', 'deep_cleaning', 'move_in'].includes(service);
+      const amount = gleamDiscountApplies ? Math.round(baseAmount * 0.85) : baseAmount;
       return {
       ...base,
       quoteType: 'fixed_price',
         amount,
+      discount: gleamDiscountApplies ? { percentage: 15, amount: baseAmount - amount } : null,
       priceRange: {
           minimum: amount,
           maximum: amount + 100
@@ -188,6 +209,6 @@
     };
   }
 
-  global.CleaningQuoteEngine = { calculateQuote, chooseSizeBand, normalizeService, resolveService, resolveCompany, roundToNearestHalfHour, conservativeBedBathBand, SERVICES, SIZE_BANDS, INITIAL_LEAD_SERVICE_IDS };
+  global.CleaningQuoteEngine = { calculateQuote, chooseSizeBand, normalizeService, resolveService, resolveCompany, roundToNearestHalfHour, conservativeBedBathBand, SERVICES, COMPANIES, JHEYS_STYLE_COMPANIES, SIZE_BANDS, INITIAL_LEAD_SERVICE_IDS };
   if (typeof module !== 'undefined') module.exports = global.CleaningQuoteEngine;
 })(typeof globalThis !== 'undefined' ? globalThis : window);

@@ -1,0 +1,198 @@
+Atendente: Andie
+
+### 1. Cliente recebeu o orçamento, mas não respondeu
+
+*Follow-up #1*
+
+Hi {ClientName},
+
+I just wanted to follow up and make sure you had a chance to review the estimate we sent over.
+
+If you have any questions about the service or would like to go over the details, Andie will be happy to help.
+
+Da Silva Cleaning Services
+📞 (925) 515-3121
+
+*Follow-up #2*
+
+Hi {ClientName},
+
+Just checking in to see if you're still considering cleaning services for your home.
+
+If you'd like to move forward or if there's anything you'd like us to adjust or clarify in the estimate, just let us know. We'd be happy to help.
+
+Da Silva Cleaning Services
+📞 (925) 515-3121
+
+*Follow-up #3*
+
+Hi {ClientName},
+
+I just wanted to follow up one last time regarding the estimate we sent.
+
+If cleaning your home is still on your list, we'd be happy to assist whenever you're ready. And if you've already made other arrangements, no worries at all.
+
+Thank you for considering Da Silva Cleaning Services!
+
+Da Silva Cleaning Services
+📞 (925) 515-3121
+
+
+### 2. Cliente não recebeu o orçamento porque faltavam informações e não respondeu
+
+Aqui o objetivo é *não falar de orçamento como se ele já existisse*. O foco é lembrar o que precisamos para conseguir preparar a cotação.
+
+*Follow-up #1*
+
+Hi {ClientName},
+
+I just wanted to follow up regarding the information we requested for your cleaning estimate.
+
+Once we have those details, we'll be happy to review everything and prepare the best option for your home.
+
+Whenever you have a chance, just send us the information here.
+
+Da Silva Cleaning Services
+📞 (925) 515-3121
+
+*Follow-up #2*
+
+Hi {ClientName},
+
+Just checking in to see if you're still looking for cleaning services.
+
+We're still happy to prepare your estimate. We just need the remaining details about your home so we can make sure the quote is as accurate as possible.
+
+Feel free to send them whenever it's convenient for you.
+
+Da Silva Cleaning Services
+📞 (925) 515-3121
+
+*Follow-up #3*
+
+Hi {ClientName},
+
+I just wanted to follow up one last time regarding your cleaning request.
+
+Since we haven't received the remaining information, we won't be able to prepare the estimate just yet. If you'd still like a quote in the future, simply reach out and we'll be happy to help.
+
+Thank you for considering Da Silva Cleaning Services!
+
+Da Silva Cleaning Services
+📞 (925) 515-3121
+
+
+### 3. Cliente recebeu o orçamento, respondeu em algum momento, mas depois sumiu
+
+Aqui a situação é diferente porque *já houve uma conversa*. Então o texto pode ser um pouco mais pessoal e retomar o contato sem parecer um follow-up automático.
+
+*Follow-up #1*
+
+Hi {ClientName},
+
+I just wanted to check back in with you regarding your cleaning service.
+
+We had previously been in touch, and I wanted to see if you had any questions about the estimate or if there's anything else you'd like to discuss.
+
+We're happy to help whenever you're ready.
+
+Da Silva Cleaning Services
+📞 (925) 515-3121
+
+*Follow-up #2*
+
+Hi {ClientName},
+
+Just touching base with you again to see if you're still considering the cleaning service we discussed.
+
+If your plans have changed, that's completely understandable. And if you're still looking, we'd be happy to answer any questions or help with the next step.
+
+Da Silva Cleaning Services
+📞 (925) 515-3121
+
+*Follow-up #3*
+
+Hi {ClientName},
+
+I just wanted to reach out one last time in case you're still looking for help with your home cleaning.
+
+If you'd like to continue with the service we discussed, simply send us a message and we'll be happy to assist with scheduling.
+
+Wishing you all the best, and thank you again for considering us!
+
+Da Silva Cleaning Services
+📞 (925) 515-3121
+
+
+### 4. Cliente não recebeu o orçamento inicialmente, respondeu o que faltava, recebeu o orçamento e depois sumiu
+
+Nesse caso, vale reconhecer que *a conversa avançou*: ele enviou as informações, vocês prepararam e enviaram o orçamento. Isso deixa o follow-up mais contextualizado.
+
+*Follow-up #1*
+
+Hi {ClientName},
+
+Thank you again for sending us the information we needed for your home.
+
+I just wanted to follow up and make sure you had a chance to review the estimate we sent over.
+
+If you have any questions or would like to go over the details, we're happy to help.
+
+Da Silva Cleaning Services
+📞 (925) 515-3121
+
+*Follow-up #2*
+
+Hi {ClientName},
+
+Just checking in regarding the estimate we prepared for your home.
+
+If you're still considering the service, we'd be happy to answer any questions or help you decide on the best option.
+
+Whenever you're ready, just send us a message.
+
+Da Silva Cleaning Services
+📞 (925) 515-3121
+
+*Follow-up #3*
+
+Hi {ClientName},
+
+I just wanted to follow up one last time regarding the estimate we sent after receiving the information about your home.
+
+If you're still looking for a cleaning service, we'd be happy to help whenever you're ready. And if you've already made other arrangements, we completely understand.
+
+Thank you for giving us the opportunity to assist you!
+
+Da Silva Cleaning Services
+📞 (925) 515-3121
+
+COTAÇÃO
+
+Hi! Thank you for reaching out to Da Silva Cleaning Services! 😊
+
+Based on your home's size, here's our estimate:
+
+🧼 Recommended Service: [Cleaning Service]
+🏡 Home Size: [Number of bedrooms] bedrooms, [Number of bathrooms] bathrooms
+
+💰 Estimated Price: $[Minimum]–$[Maximum]
+⏱️ Estimated Time: Approximately [Time Range] with a team of 2 cleaners.
+
+The final price will depend on the home's current condition and the level of detail required.
+
+Let us know if you have any questions or would like to schedule your cleaning. We'd be happy to help!
+
+Da Silva Cleaning Services
+📞 (925) 515-3121
+
+ARQUIVAMENTO
+
+Hi {ClientName}, since we haven't heard back, we'll go ahead and close this request for now.
+
+If you ever need professional cleaning in the future, simply reach out again—we'll be happy to prepare a new quote and assist you.
+
+We appreciate the opportunity and hope to work with you someday.
+
+Da Silva Cleaning Services
+📞 (925) 515-3121

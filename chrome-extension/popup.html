@@ -13,9 +13,9 @@
         <h2>Manual quote</h2>
         <p>Use this from Thumbtack or any other site. Enter the lead details, find availability, then copy the message to paste where you reply.</p>
         <div class="manual-grid">
-          <label>Company<select id="manual-company"><option value="kacs">KACS Cleaning Services</option><option value="jheys">Jhey's Cleaning</option></select></label>
+          <label>Company<select id="manual-company"><option value="kacs">KACS Cleaning Services</option><option value="jheys">Jhey's Cleaning</option><option value="dasilva">Da Silva Cleaning Services</option><option value="gleam">Gleam Team Housecleaning</option><option value="express">Express House Cleaning</option></select></label>
           <label>Client name<input id="manual-name" type="text" placeholder="Optional"></label>
-          <label>Service<select id="manual-service"><option value="first_cleaning">First Cleaning / Regular home cleaning</option><option value="deep_cleaning">Deep Cleaning</option><option value="move_in_out">Move-In / Move-Out Cleaning</option><option value="monthly">Monthly Cleaning</option><option value="biweekly">Bi-weekly Cleaning</option><option value="post_construction">Post-Construction Cleaning</option></select></label>
+          <label>Service<select id="manual-service"><option value="first_cleaning">First Cleaning / Regular home cleaning</option><option value="deep_cleaning">Deep Cleaning</option><option value="move_in_out">Move-In / Move-Out Cleaning</option><option value="move_in">Move-In Cleaning (Gleam)</option><option value="move_out">Move-Out Cleaning (Gleam)</option><option value="monthly">Monthly Cleaning</option><option value="biweekly">Bi-weekly Cleaning</option><option value="post_construction">Post-Construction Cleaning</option></select></label>
           <label>Square feet<input id="manual-square-feet" type="number" min="1" placeholder="Optional"></label>
           <label>Bedrooms<input id="manual-bedrooms" type="number" min="0" step="1" placeholder="Optional"></label>
           <label>Bathrooms<input id="manual-bathrooms" type="number" min="0" step="0.5" placeholder="Optional"></label>
@@ -43,7 +43,7 @@
       <details class="cleaner-availability-settings">
         <summary>Cleaner availability</summary>
         <p>Import an Excel schedule with a <em>Cleaner</em> column and date columns. These openings are combined with the Presto schedule when availability is checked.</p>
-        <label>Company<select id="cleaner-availability-company"><option value="kacs">KACS Cleaning Services</option><option value="jheys">Jhey's Cleaning</option></select></label>
+        <label>Company<select id="cleaner-availability-company"><option value="kacs">KACS Cleaning Services</option><option value="jheys">Jhey's Cleaning</option><option value="dasilva">Da Silva Cleaning Services</option><option value="gleam">Gleam Team Housecleaning</option><option value="express">Express House Cleaning</option></select></label>
         <label>Schedule year<input id="cleaner-availability-year" type="number" min="2020" max="2100"></label>
         <input id="cleaner-availability-file" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
         <div><button id="import-cleaner-availability" type="button">Import Excel schedule</button><button id="clear-cleaner-availability" class="quiet" type="button">Clear imported schedule</button></div>

@@ -15,13 +15,16 @@ Extensão Chrome local para apoiar o atendimento de novas leads de empresas de l
 | --- | --- | --- |
 | KACS Cleaning Services LLC | Estimativa de horas; não informar valor total ao cliente | `docs/guia_precificacao_horas.xlsx`, aba `KACS` |
 | Jhey's Cleaning | Faixa de preço: tabela base até US$100 acima | `docs/guia_precificacao.xlsx`, aba `Empresa iniciante` |
+| Da Silva Cleaning Services | Mesma faixa e tabela da Jhey's; mensagens e telefone próprios | `docs/DaSilva Cleaning.txt` |
+| Gleam Team Housecleaning | Mesma faixa e tabela da Jhey's; 15% de desconto em First, Deep e Move-In | `docs/Gleam Team Housecleaning.txt` |
+| Express House Cleaning | Mesma faixa e tabela da Jhey's; mensagens e telefone próprios | `docs/Express House Cleaning.txt` |
 
 Os nomes `Jhey's` e `Jhey’s` são equivalentes. A identificação no fallback visual do Yelp lê o nome mostrado na página e também reconhece as contas atualmente conhecidas:
 
 - KACS: `FAHbiW72jLTiNDvcOptrfg`
 - Jhey’s: `BnI3aSQTdRlX1YGUuPfAiA`
 
-Empresa ausente ou desconhecida exige escolha humana no campo **Company pricing**. A extensão não deve escolher uma tabela de preço por inferência.
+Empresa ausente ou desconhecida exige escolha humana no campo **Company pricing**. A extensão não deve escolher uma tabela de preço por inferência. Para a Gleam, quando o Yelp informar o pedido combinado `Move-in / Move-out Cleaning`, o atendente deve escolher manualmente **Move-In** ou **Move-Out** antes de confirmar: o desconto de 15% vale somente para Move-In.
 
 ## Dados necessários
 

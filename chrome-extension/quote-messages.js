@@ -96,7 +96,12 @@
     if (requested.has('bathrooms')) items.push('• Number of bathrooms');
     if (requested.has('photos')) items.push('• A few photos of the main areas (optional)');
     if (!items.length) return null;
-    const companyName = company === 'jheys' ? 'Jhey’s Cleaning' : 'KACS Cleaning Services LLC';
+    const companyName = {
+      jheys: 'Jhey’s Cleaning',
+      dasilva: 'Da Silva Cleaning Services',
+      gleam: 'Gleam Team Housecleaning',
+      express: 'Express House Cleaning'
+    }[company] || 'KACS Cleaning Services LLC';
     return [
       greeting(lead?.customerName),
       '',
@@ -223,6 +228,24 @@
           "Please feel free to share any details or questions -- we'd be glad to prepare a personalized quote that works perfectly for you."
         ].join('\n')
       }
+    ],
+    dasilva: [
+      { signature: 'chance to review the estimate we sent over', message: (name) => [`Hi ${name},`, '', 'I just wanted to follow up and make sure you had a chance to review the estimate we sent over.', '', "If you have any questions about the service or would like to go over the details, we'll be happy to help.", '', 'Da Silva Cleaning Services', '📞 (925) 515-3121'].join('\n') },
+      { signature: 'information we requested for your cleaning estimate', message: (name) => [`Hi ${name},`, '', 'I just wanted to follow up regarding the information we requested for your cleaning estimate.', '', "Once we have those details, we'll be happy to review everything and prepare the best option for your home.", '', 'Whenever you have a chance, just send us the information here.', '', 'Da Silva Cleaning Services', '📞 (925) 515-3121'].join('\n') },
+      { signature: 'we had previously been in touch', message: (name) => [`Hi ${name},`, '', 'I just wanted to check back in with you regarding your cleaning service.', '', 'We had previously been in touch, and I wanted to see if you had any questions about the estimate or if there’s anything else you’d like to discuss.', '', "We're happy to help whenever you're ready.", '', 'Da Silva Cleaning Services', '📞 (925) 515-3121'].join('\n') },
+      { signature: 'sending us the information we needed for your home', message: (name) => [`Hi ${name},`, '', 'Thank you again for sending us the information we needed for your home.', '', 'I just wanted to follow up and make sure you had a chance to review the estimate we sent over.', '', "If you have any questions or would like to go over the details, we're happy to help.", '', 'Da Silva Cleaning Services', '📞 (925) 515-3121'].join('\n') }
+    ],
+    gleam: [
+      { signature: 'chance to look over the quote', message: (name) => [`Hi ${name}! Just wanted to check back in and see if you had a chance to look over the quote.`, '', 'Has the timing changed on your end, or are you still thinking about getting the cleaning scheduled?', "Either way, no worries. If you have any questions, I'm here.", '', 'Gleam Team Housecleaning', '📞 (925) 515-5461'].join('\n') },
+      { signature: 'information we were still missing for your cleaning quote', message: (name) => [`Hi ${name}! Just wanted to check back in about the information we were still missing for your cleaning quote.`, '', "If it's easier, you can just send us a few pictures or a short walkthrough video. We don't need anything fancy — it just helps us get a better idea of the home and price it properly.", '', "Whenever you get a chance, send it over and I'll take it from there.", '', 'Gleam Team Housecleaning', '📞 (925) 515-5461'].join('\n') },
+      { signature: 'circle back on our conversation about the cleaning', message: (name) => [`Hi ${name}! Just wanted to circle back on our conversation about the cleaning.`, '', "I wanted to see if you were still thinking about moving forward or if something changed on your end.", '', 'No worries either way — just let me know when you get a chance.', '', 'Gleam Team Housecleaning', '📞 (925) 515-5461'].join('\n') },
+      { signature: 'details you sent', message: (name) => [`Hi ${name}! Just wanted to check in now that you've had a chance to look over the quote we put together from the details you sent.`, '', "Does everything look good on your end, or is there anything you'd like us to change?", '', 'Gleam Team Housecleaning', '📞 (925) 515-5461'].join('\n') }
+    ],
+    express: [
+      { signature: 'chance to review the estimate we sent over', message: (name) => [`Hi ${name}! This is Andie with Express House Cleaning.`, '', 'I just wanted to follow up and make sure you had a chance to review the estimate we sent over.', '', "If you have any questions about the cleaning or what's included, I'd be happy to help.", '', 'Express House Cleaning', '📞 (510) 757-9573'].join('\n') },
+      { signature: 'we’re still missing', message: (name) => [`Hi ${name}! This is Andie with Express House Cleaning.`, '', 'I’m following up on your cleaning request. We’re still missing the remaining information before we can prepare your estimate.', '', "Whenever you have a chance, just send that information over and I’ll be happy to continue with the quote.", '', 'Express House Cleaning', '📞 (510) 757-9573'].join('\n') },
+      { signature: 'regarding our conversation and the cleaning estimate', message: (name) => [`Hi ${name}! This is Andie with Express House Cleaning.`, '', 'I just wanted to check back in regarding our conversation and the cleaning estimate.', '', "I wasn’t sure if you were still considering the service, so I wanted to see if you had any questions or if there was anything else you needed from us.", '', 'Express House Cleaning', '📞 (510) 757-9573'].join('\n') },
+      { signature: 'thank you again for sending over the information we needed', message: (name) => [`Hi ${name}! This is Andie with Express House Cleaning.`, '', 'Thank you again for sending over the information we needed.', '', 'I just wanted to check in and make sure you had a chance to review the estimate we sent afterward.', '', "If you have any questions about the quote or the service, I’d be happy to help.", '', 'Express House Cleaning', '📞 (510) 757-9573'].join('\n') }
     ]
   };
   function followUpStatus(company, lead, conversationText) {
@@ -236,6 +259,22 @@
   }
   function archivingMessage(company, lead) {
     const name = lead?.customerName || 'there';
+    if (company === 'dasilva') return [
+      `Hi ${name}, since we haven't heard back, we'll go ahead and close this request for now.`, '',
+      "If you ever need professional cleaning in the future, simply reach out again—we'll be happy to prepare a new quote and assist you.", '',
+      'We appreciate the opportunity and hope to work with you someday.', '',
+      'Da Silva Cleaning Services', '📞 (925) 515-3121'
+    ].join('\n');
+    if (company === 'gleam') return [
+      `Hi ${name}! We hadn't heard back, so we're going to leave this one here for now.`, '',
+      'No worries at all if the timing wasn’t right. If you need a cleaning later, just send us a message and we’ll pick things back up.', '',
+      'Take care!', 'Gleam Team Housecleaning', '📞 (925) 515-5461'
+    ].join('\n');
+    if (company === 'express') return [
+      `Hi ${name}!`, '', 'Thank you once again for reaching out to Express House Cleaning!', '',
+      'Since I haven’t heard back, I’ll go ahead and close your request for now. You’re always welcome to contact us again in the future.', '',
+      'Wishing you all the best!', '', 'You can reach us by text or call at:', '', '📞 (510) 757-9573', 'Express House Cleaning'
+    ].join('\n');
     if (company === 'jheys') return [
       `Hi ${name}, thank you again for reaching out to Jhey's Cleaning.`,
       '',
@@ -370,6 +409,40 @@
     return message.join('\n');
   }
 
+  const fixedPriceCompanies = {
+    dasilva: { name: 'Da Silva Cleaning Services', phone: '(925) 515-3121' },
+    gleam: { name: 'Gleam Team Housecleaning', shortName: 'Gleam Team', phone: '(925) 515-5461' },
+    express: { name: 'Express House Cleaning', phone: '(510) 757-9573' }
+  };
+  function fixedPriceMissingSizeMessage(review) {
+    const quote = review.quote || {}; const lead = review.lead || {}; const company = fixedPriceCompanies[quote.company];
+    return [
+      greeting(lead.customerName), '', `Thank you for reaching out to ${company.name}!`, '',
+      `To prepare an accurate estimate for your ${quote.serviceLabel || lead.serviceType || 'cleaning service'}, could you please share the approximate square footage and the number of bedrooms and bathrooms?`, '',
+      'A few photos or a short video of the main areas are also welcome.', '', company.name, `📞 ${company.phone}`
+    ].join('\n');
+  }
+  function fixedPriceMessage(review) {
+    const quote = review.quote || {}; const lead = review.lead || {}; const company = fixedPriceCompanies[quote.company];
+    const price = `$${quote.priceRange?.minimum ?? quote.amount}–$${quote.priceRange?.maximum ?? Number(quote.amount || 0) + 100}`;
+    const message = [greeting(lead.customerName), ''];
+    if (quote.company === 'dasilva') {
+      message.push(`Thank you for reaching out to ${company.name}! 😊`, '', "Based on your home's size, here's our estimate:", '', `🧼 Recommended Service: ${quote.serviceLabel}`, ...homeDetails(lead), `💰 Estimated Price: ${price}`, '', "The final price will depend on the home's current condition and the level of detail required.");
+    } else if (quote.company === 'gleam') {
+      message.push(`Thank you for reaching out to ${company.shortName}! 😊`, '', "Based on what you shared, here's our estimate for your home:", '', `🧽 ${quote.serviceLabel}`, `💲 Estimated price: ${price}`);
+      if (quote.discount?.percentage) message.push(`✨ ${quote.discount.percentage}% discount applied to this initial cleaning`);
+      message.push('👥 Team of 2 cleaners', '', '🌱 Green cleaning products', '🧒 Kid-safe', '🐶 Pet-safe', '🚫 Non-toxic products', '', 'Our standard cleaning includes dusting and wiping surfaces, including shelves, cleaning kitchen and bathroom surfaces, wiping down the exterior of appliances, vacuuming, mopping, and general tidying of the areas we clean.', '', "The initial cleaning price is an estimate and will depend on the home's size, condition, and cleaning needs.");
+    } else {
+      message.push('Thank you so much for contacting Express House Cleaning! We truly appreciate your interest in our services.', '', "Based on the information provided, here's our estimate for your home:", '', `🧼 ${quote.serviceLabel}`, '', `💲 Estimated price: ${price}`, '👥 Team: 2 professional cleaners', '', "The final price will depend on the home's overall condition and the level of detail required.");
+    }
+    if (quote.service === 'move_in_out') message.push('', 'To make the estimate more accurate and fair, please confirm whether the service is for a move-in or move-out.');
+    const limitations = serviceLimitations(lead); if (limitations.length) message.push('', ...separatedParagraphs(limitations));
+    const availability = selectedAvailability(review); if (availability.length) message.push('', ...availability);
+    const noAvailability = noAvailabilityFollowUp(review); if (noAvailability.length) message.push('', ...noAvailability);
+    message.push('', 'Please let us know if you have any questions or would like to schedule your cleaning. We’d be happy to help! 😊', '', company.name, `📞 ${company.phone}`);
+    return message.join('\n');
+  }
+
   function approvedMessage(review) {
     const quote = review.quote || {};
     if (quote.company === 'kacs' && quote.status === 'missing_size') return missingSizeMessage(review);
@@ -378,6 +451,8 @@
     }
     if (quote.company === 'jheys' && quote.status === 'missing_size') return jheysMissingSizeMessage(review);
     if (quote.company === 'jheys' && quote.amount) return jheysMessage(review);
+    if (fixedPriceCompanies[quote.company] && quote.status === 'missing_size') return fixedPriceMissingSizeMessage(review);
+    if (fixedPriceCompanies[quote.company] && quote.amount) return fixedPriceMessage(review);
     return 'This lead needs a manual review before a message can be prepared.';
   }
 

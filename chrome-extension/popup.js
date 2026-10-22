@@ -50,7 +50,7 @@ function prestoStatus(response, restored = false) {
   prestoStatusElement.textContent = `${prefix}${response.company?.name || 'Presto'}: ${(response.jobs || []).length} visible jobs read; ${withCoordinates} with route coordinates.`;
 }
 async function loadLastPrestoScan() {
-  const snapshots = await chrome.storage.local.get(['prestoJobs:kacs', 'prestoJobs:jheys']);
+  const snapshots = await chrome.storage.local.get(Object.keys(CleaningQuoteEngine.COMPANIES).map((company) => `prestoJobs:${company}`));
   const latest = Object.values(snapshots)
     .filter((snapshot) => snapshot?.capturedAt && Array.isArray(snapshot.jobs))
     .sort((a, b) => new Date(b.capturedAt) - new Date(a.capturedAt))[0];
@@ -70,7 +70,7 @@ function card(review) {
   const href = review.url || lead.url;
   return `<article class="review" data-id="${escapeHtml(review.id)}">
     <div class="card-header"><strong>${escapeHtml(lead.customerName || 'Client name unavailable')}</strong><span class="state ${review.state}">${stateLabel(review.state)}</span></div>
-    <p class="company">${quote.company === 'kacs' ? 'KACS' : "Jhey's Cleaning"}</p>
+    <p class="company">${CleaningQuoteEngine.COMPANIES[quote.company]?.name || 'Unknown company'}</p>
     <p class="service">${escapeHtml(quote.serviceLabel || 'Service needs review')}</p>
     <p class="result">${result(review)}</p>
     <dl><div><dt>Source</dt><dd>${escapeHtml(lead.platform || 'Unknown')}</dd></div><div><dt>Size band</dt><dd>${quote.size?.band ? `Up to ${quote.size.band} sq. ft.` : 'Not resolved'}</dd></div><div><dt>Saved</dt><dd>${escapeHtml(date(review.savedAt))}</dd></div></dl>
@@ -274,7 +274,7 @@ function manualLead() {
   return {
     id: `manual:${crypto.randomUUID()}`,
     platform: 'manual',
-    companyName: company === 'kacs' ? 'KACS Cleaning Services' : "Jhey's Cleaning",
+    companyName: CleaningQuoteEngine.COMPANIES[company]?.name || null,
     customerName: manualFields.name.value.trim() || null,
     serviceType: CleaningQuoteEngine.SERVICES[manualFields.service.value],
     squareFeet: manualFields.squareFeet.value.trim() || null,

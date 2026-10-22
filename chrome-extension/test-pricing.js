@@ -26,6 +26,13 @@ check(engine.roundToNearestHalfHour(2.2) === 2 && engine.roundToNearestHalfHour(
 check(engine.normalizeService('Move-in or move-out cleaning') === 'move_in_out', 'Combined move-in/out Yelp label should use the unified service');
 quote = engine.calculateQuote({ companyName: "Jhey's Cleaning", bedrooms: 3, bathrooms: 2, serviceType: 'Move-in or move-out cleaning' });
 check(quote.service === 'move_in_out' && quote.amount === 388 && quote.priceRange.maximum === 488, 'Jhey’s combined move-in/out quote must use the rounded average plus $100');
+quote = engine.calculateQuote({ companyName: 'Gleam Team Housecleaning', bedrooms: 3, bathrooms: 2, serviceType: 'First Cleaning' });
+check(quote.company === 'gleam' && quote.amount === 213 && quote.priceRange.maximum === 313 && quote.discount?.percentage === 15, 'Gleam First Cleaning must apply its 15% discount before the $100 range');
+quote = engine.calculateQuote({ companyName: 'Gleam Team Housecleaning', bedrooms: 3, bathrooms: 2, serviceType: 'Move-In Cleaning' });
+check(quote.service === 'move_in' && quote.amount === 310 && quote.discount?.percentage === 15, 'Gleam Move-In must be quoted separately with the 15% discount');
+quote = engine.calculateQuote({ companyName: 'Gleam Team Housecleaning', bedrooms: 3, bathrooms: 2, serviceType: 'Move-Out Cleaning' });
+check(quote.service === 'move_out' && quote.amount === 410 && !quote.discount, 'Gleam Move-Out must remain separate and must not receive the discount');
+check(engine.resolveCompany('Da Silva Cleaning Services') === 'dasilva' && engine.resolveCompany('Express House Cleaning') === 'express', 'New company names must be auto-detected');
 check(engine.resolveService('Regular home cleaning', 'Once') === 'first_cleaning', 'One-time regular cleaning should map to First Cleaning');
 check(engine.resolveService('Regular home cleaning', 'Biweekly') === 'first_cleaning', 'Recurring new leads should start with First Cleaning');
 check(engine.resolveService('Regular home cleaning', 'Weekly') === 'first_cleaning', 'Weekly new leads should start with First Cleaning');
@@ -51,6 +58,10 @@ const missingSizeMessage = messages.approvedMessage({ lead: { customerName: 'Sam
 check(missingSizeMessage.includes('Hi Sample,') && missingSizeMessage.includes('bedrooms and bathrooms') && missingSizeMessage.includes('Deep Cleaning'), 'KACS missing-size lead should request bedrooms and bathrooms');
 const jheysMessage = messages.approvedMessage({ lead: { customerName: 'Marvin', bedrooms: 4, bathrooms: 4 }, quote: { company: 'jheys', serviceLabel: 'Deep Cleaning', amount: 900 } });
 check(jheysMessage.includes('Hi Marvin,') && jheysMessage.includes('welcoming new clients') && jheysMessage.includes('Estimated investment: $900 to $1000') && jheysMessage.includes('✨ Introductory pricing for new clients') && jheysMessage.includes('quick walkthrough'), 'Jhey’s approval message should use promotional introductory pricing with the price range and walkthrough');
+const gleamMessage = messages.approvedMessage({ lead: { customerName: 'Marvin' }, quote: { company: 'gleam', service: 'move_in', serviceLabel: 'Move-in Cleaning', amount: 310, priceRange: { minimum: 310, maximum: 410 }, discount: { percentage: 15 } } });
+check(gleamMessage.includes('Gleam Team') && gleamMessage.includes('15% discount applied') && gleamMessage.includes('$310–$410'), 'Gleam approval message must show its discounted range and discount');
+const expressArchive = messages.archivingMessage('express', { customerName: 'Marvin' });
+check(expressArchive.includes('Express House Cleaning') && expressArchive.includes('(510) 757-9573'), 'Express archiving message must use its script contact details');
 const limitationsMessage = messages.approvedMessage({ lead: { customerName: 'Sample', bedrooms: 2, bathrooms: 1, extraServices: 'Pet odor treatment, Rug cleaning, Upholstery cleaning' }, quote: { company: 'kacs', service: 'deep_cleaning', serviceLabel: 'Deep Cleaning', estimatedHours: { minimum: 2, maximum: 3.5 } } });
 check(limitationsMessage.includes('🧼 A quick note about the additional services requested:') && limitationsMessage.includes('• Professional rug shampoo/extraction cleaning is not included') && !limitationsMessage.includes('carpet or rug shampoo') && limitationsMessage.includes('• Professional upholstery cleaning is not included') && limitationsMessage.includes('• Specialized pet odor treatment and guaranteed odor removal are not included') && !limitationsMessage.includes('• we ') && !limitationsMessage.includes('⚠️ Please note'), 'Multiple requested limitations must use one softer grouped note');
 const carpetAndRugMessage = messages.approvedMessage({ lead: { extraServices: 'Carpet cleaning, Rug cleaning' }, quote: { company: 'jheys', serviceLabel: 'First Cleaning', amount: 250 } });

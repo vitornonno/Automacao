@@ -1,0 +1,132 @@
+FOLLOW-UPS
+Atendente: Andie
+
+SITUAÇÃO 1
+ORÇAMENTO RECEBIDO, CLIENTE NUNCA RESPONDEU
+Follow-up 1
+Hi {ClientName}! Just wanted to check back in and see if you had a chance to look over the quote.
+Has the timing changed on your end, or are you still thinking about getting the cleaning scheduled?
+Either way, no worries. If you have any questions, I'm here.
+Gleam Team Housecleaning
+📞 (925) 515-5461
+
+Follow-up 2
+Hi {ClientName}, just checking in again on the cleaning.
+I know things get busy, so I wanted to make sure the quote didn't get lost in the shuffle. If there's anything you'd like to change or talk through, just send it my way.
+Gleam Team Housecleaning
+📞 (925) 515-5461
+
+Follow-up 3
+Hi {ClientName}! Just one last check-in from us about the cleaning.
+If you'd still like to schedule, just let me know and we'll pick things back up. And if the timing isn't right anymore, that's completely okay too.
+Whenever you're ready, we're here.
+Gleam Team Housecleaning
+📞 (925) 515-5461
+
+SITUAÇÃO 2
+ORÇAMENTO NÃO FOI ENVIADO — FALTAVAM INFORMAÇÕES E CLIENTE SUMIU
+Follow-up 1
+Hi {ClientName}! Just wanted to check back in about the information we were still missing for your cleaning quote.
+If it's easier, you can just send us a few pictures or a short walkthrough video. We don't need anything fancy — it just helps us get a better idea of the home and price it properly.
+Whenever you get a chance, send it over and I'll take it from there.
+Gleam Team Housecleaning
+📞 (925) 515-5461
+
+Follow-up 2
+Hi {ClientName}, just checking in on the quote.
+We haven't been able to put the estimate together yet because we're still missing a few details about the home.
+Whenever you have a moment, send over the information or a few pictures and we'll take care of the rest.
+Gleam Team Housecleaning
+📞 (925) 515-5461
+
+Follow-up 3
+Hi {ClientName}! Just one last check-in from Gleam Team Housecleaning.
+We haven't received the remaining details we need for the quote, so we'll leave things here for now.
+If you'd still like an estimate later, just message us whenever you're ready and we'll pick it right back up.
+Gleam Team Housecleaning
+📞 (925) 515-5461
+
+SITUAÇÃO 3
+CLIENTE RECEBEU O ORÇAMENTO, CONVERSOU E DEPOIS SUMIU
+Aqui a Andie deve retomar a relação, não simplesmente disparar um “follow-up”.
+
+Follow-up 1
+Hi {ClientName}! Just wanted to circle back on our conversation about the cleaning.
+We'd talked about [SERVICE / DATE / DETAIL], and I wanted to see if you were still thinking about moving forward or if something changed on your end.
+No worries either way — just let me know when you get a chance.
+Gleam Team Housecleaning
+📞 (925) 515-5461
+
+Follow-up 2
+Hi {ClientName}, just checking back in with you.
+I'm not sure if you're still figuring out the timing or if the cleaning ended up going in a different direction. If you want to revisit the quote or change anything about the service, I'm happy to take another look.
+Gleam Team Housecleaning
+📞 (925) 515-5461
+
+Follow-up 3
+Hi {ClientName}! Just one last message from us for now.
+If the cleaning isn't something you need right now, no worries at all. And if you'd like to pick things back up later, just send us a message and we'll be happy to continue where we left off.
+Take care!
+Gleam Team Housecleaning
+📞 (925) 515-5461
+
+SITUAÇÃO 4
+FALTAVAM INFORMAÇÕES → CLIENTE RESPONDEU → ORÇAMENTO FOI ENVIADO → SUMIU
+Aqui a Andie deve reconhecer implicitamente que o cliente já fez a parte dele.
+Follow-up 1
+Hi {ClientName}! Just wanted to check in now that you've had a chance to look over the quote we put together from the details you sent.
+Does everything look good on your end, or is there anything you'd like us to change?
+Gleam Team Housecleaning
+📞 (925) 515-5461
+
+Follow-up 2
+Hi {ClientName}, just checking back in on the estimate we sent over.
+If you're still thinking about it and have any questions, feel free to ask. And if you'd like us to adjust the scope a little, we can take another look at that too.
+Gleam Team Housecleaning
+📞 (925) 515-5461
+
+Follow-up 3
+Hi {ClientName}! Just one last check-in from Gleam Team Housecleaning about the quote.
+If you'd still like to get the cleaning scheduled, just let me know and we'll take it from there. If the timing changed, that's completely okay too.
+Whenever you need us, we're here.
+Gleam Team Housecleaning
+📞 (925) 515-5461
+
+COTAÇÃO
+
+Hi [Client Name]! Thank you for reaching out to Gleam Team! 😊
+
+Based on what you shared, here's our estimate for your home:
+
+🧽 *[Cleaning Type]*
+💲 Estimated price: $[Low]–$[High]
+⏱️ Estimated time: [X–X hours]
+👥 Team of 2 cleaners
+
+🗓️ *[Recurring Cleaning, if applicable]*
+💲 Price: $[Fixed Price] per visit
+📅 Every [2 weeks / 4 weeks]
+
+🌱 Green cleaning products
+🧒 Kid-safe
+🐶 Pet-safe
+🚫 Non-toxic products
+
+Our standard cleaning includes dusting and wiping surfaces, including shelves, cleaning kitchen and bathroom surfaces, wiping down the exterior of appliances, vacuuming, mopping, and general tidying of the areas we clean.
+
+We'll also be happy to share our cleaning checklist so you can review everything included in the service.
+
+The initial cleaning price is an estimate and will depend on the home's size, condition, and cleaning needs. For recurring services, we'll confirm the regular rate after the first cleaning, when applicable.
+
+Take a look whenever you get a chance, and let us know if you have any questions or would like to schedule your cleaning. We'd be happy to help! 💛
+
+Gleam Team
+📞 (925) 515-5461
+
+Arquivamento
+
+Hi {ClientName}! We hadn't heard back, so we're going to leave this one here for now.
+No worries at all if the timing wasn't right. If you need a cleaning later, just send us a message and we'll pick things back up.
+Take care!
+Gleam Team Housecleaning
+📞 (925) 515-5461
