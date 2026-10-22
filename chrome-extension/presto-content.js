@@ -6,15 +6,19 @@ function text(element) {
 }
 
 function timeFromEvent(element) {
-  const match = text(element).match(/\b(\d{1,2}):([0-5]\d)\s*(am|pm)\b/i);
+  const match = text(element).match(/\b(\d{1,2}):([0-5]\d)\s*(am|pm)?\b/i);
   if (!match) return null;
-  let hour = Number(match[1]) % 12;
-  if (match[3].toLowerCase() === 'pm') hour += 12;
+  let hour = Number(match[1]);
+  if (match[3]) {
+    hour %= 12;
+    if (match[3].toLowerCase() === 'pm') hour += 12;
+  }
+  if (hour > 23) return null;
   return `${String(hour).padStart(2, '0')}:${match[2]}`;
 }
 
 function customerNameFromEvent(element) {
-  return text(element).replace(/^\d{1,2}:[0-5]\d\s*(?:am|pm)\s*/i, '').trim() || null;
+  return text(element).replace(/^\d{1,2}:[0-5]\d\s*(?:am|pm)?\s*/i, '').trim() || null;
 }
 
 function todayInCalifornia() {
@@ -113,7 +117,7 @@ function selectedJobDetails(card) {
   const match = mapLink?.href.match(/[?&]q=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/);
   const coordinates = match ? { latitude: Number(match[1]), longitude: Number(match[2]), link: mapLink.href } : null;
   const locationRow = mapLink?.closest('.card-info-row');
-  const priceMatch = text(card).match(/pre[cç]o:\s*\$\s*([\d,.]+)/i);
+  const priceMatch = text(card).match(/(?:pre[cç]o|price):\s*\$\s*([\d,.]+)/i);
   const cleanerRow = [...card.querySelectorAll('.card-info-row')].find((row) => row.querySelector('.fa-users'));
   const cleaners = [...new Set([...(cleanerRow?.querySelectorAll('.fa-star') || [])]
     .map((icon) => text(icon.nextElementSibling))
@@ -185,6 +189,22 @@ async function waitForCardToOpen(eventId, timeoutMilliseconds = 3000) {
   return false;
 }
 
+async function readOpenedJobDetails(timeoutMilliseconds = 3000) {
+  const startedAt = Date.now();
+  let details = { address: null, coordinates: null, price: null, cleaners: [] };
+  while (Date.now() - startedAt < timeoutMilliseconds) {
+    const card = openedServiceCard();
+    if (card) {
+      details = selectedJobDetails(card);
+      // A price or map link confirms that the asynchronously rendered card has
+      // populated its service details. This matters for the Jhey's card layout.
+      if (details.coordinates || Number.isFinite(details.price)) return details;
+    }
+    await sleep(125);
+  }
+  return details;
+}
+
 async function visibleJobSnapshot(debug) {
   const jobs = [];
   for (const event of visibleEvents()) {
@@ -192,8 +212,7 @@ async function visibleJobSnapshot(debug) {
     const liveEvent = document.getElementById(`event-${event.id}`) || event.element;
     liveEvent.click();
     const loaded = await waitForCardToOpen(event.id);
-    if (loaded) await sleep(900);
-    const details = loaded ? selectedJobDetails(openedServiceCard()) : { address: null, coordinates: null, price: null, cleaners: [] };
+    const details = loaded ? await readOpenedJobDetails() : { address: null, coordinates: null, price: null, cleaners: [] };
     debugEvent(debug, loaded ? 'Job card captured' : 'Job card timed out', { id: event.id, loaded, hasCoordinates: Boolean(details.coordinates), hasPrice: Number.isFinite(details.price), cleaners: details.cleaners });
     jobs.push({
       id: event.id,

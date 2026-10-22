@@ -109,6 +109,7 @@ Todos os dados operacionais ficam no perfil local do Chrome, em `chrome.storage.
 
 - O popup permite importar uma escala de disponibilidade de cleaners em `.xlsx` para qualquer empresa. A planilha deve ter um ou mais blocos com `Cleaner` na primeira coluna e cabeçalhos de data em `DD/MM`; o leitor aceita `Dia todo`, `A partir das 12:30 PM`, um horário isolado e intervalos explícitos. Os registros ficam apenas no armazenamento local do Chrome até serem substituídos ou limpos.
 - Para KACS, o cálculo combina essas janelas importadas com a agenda roteirizada do Rafael no Presto. Cada janela importada representa outra equipe e só é oferecida se comportar toda a duração estimada do serviço.
+- O leitor Presto aceita horários tanto em AM/PM quanto em 24 horas e reconhece os rótulos de preço `Preço:` e `Price:` usados pelas empresas.
 
 O Presto será a fonte de verdade para agenda. KACS e Jhey's usam agendas independentes; uma disponibilidade nunca pode considerar jobs, equipes ou horários da outra empresa. Os cartões de job abertos expõem início, endereço, coordenadas do Google Maps, cleaner/equipe, tipo de serviço e preço.
 
