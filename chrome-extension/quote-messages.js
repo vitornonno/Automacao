@@ -234,6 +234,30 @@
       message: followUp.message(lead?.customerName || 'there', lead)
     }));
   }
+  function archivingMessage(company, lead) {
+    const name = lead?.customerName || 'there';
+    if (company === 'jheys') return [
+      `Hi ${name}, thank you again for reaching out to Jhey's Cleaning.`,
+      '',
+      'As we have not heard back, we will go ahead and close this request for now. You are always welcome to reach out again by submitting a new request or contacting us at 📞 (925) 515-5090.',
+      '',
+      'Wishing you all the best.',
+      'Warm regards,',
+      "Jhey's Cleaning"
+    ].join('\n');
+    return [
+      `Hi ${name}! Thank you once again for reaching out to KACS Cleaning!`,
+      '',
+      'Since I haven’t heard back, I’ll go ahead and close your request for now, but no worries — you’re always welcome to contact us again by submitting a new request or by texting/calling us at (925) 438-0657.',
+      '',
+      'You can also explore our services here:',
+      'Our Google page: https://g.co/kgs/df1X25U',
+      '🌐 www.kacscleaning.com',
+      '',
+      'Wishing you all the best!',
+      '— Frank | KACS Cleaning Services LLC'
+    ].join('\n');
+  }
   function kacsMessage(review) {
     const quote = review.quote;
     const lead = review.lead || {};
@@ -357,6 +381,6 @@
     return 'This lead needs a manual review before a message can be prepared.';
   }
 
-  global.CleaningQuoteMessages = { approvedMessage, detailsRequestMessage, followUpStatus };
+  global.CleaningQuoteMessages = { approvedMessage, archivingMessage, detailsRequestMessage, followUpStatus };
   if (typeof module !== 'undefined') module.exports = global.CleaningQuoteMessages;
 })(globalThis);

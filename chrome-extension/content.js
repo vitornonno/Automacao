@@ -360,7 +360,8 @@
   function followUpButtons() {
     if (!canCopyApprovedMessage()) return '<button disabled>Copy follow-up</button>';
     const followUps = CleaningQuoteMessages.followUpStatus(quote.company, lead, conversationText());
-    return followUps.map((followUp) => `<button data-action="copy-follow-up" data-follow-up-number="${followUp.number}" ${followUp.sent ? 'disabled' : ''}>${followUp.sent ? `Follow-up ${followUp.number} sent` : `Copy follow-up ${followUp.number}`}</button>`).join('');
+    const buttons = followUps.map((followUp) => `<button data-action="copy-follow-up" data-follow-up-number="${followUp.number}" ${followUp.sent ? 'disabled' : ''}>${followUp.sent ? `Follow-up ${followUp.number} sent` : `Copy follow-up ${followUp.number}`}</button>`).join('');
+    return `${buttons}<button data-action="copy-archiving">Copy archiving</button>`;
   }
   function detailsRequestMarkup() {
     if (!detailsRequestOpen) return '';
@@ -526,6 +527,16 @@
         logDebug('Follow-up copied', { company: quote.company, number: followUp.number });
       } catch {
         confirmationFeedback = 'Could not copy the follow-up.';
+      }
+      render();
+    }
+    if (action === 'copy-archiving' && canCopyApprovedMessage()) {
+      try {
+        await navigator.clipboard.writeText(CleaningQuoteMessages.archivingMessage(quote.company, lead));
+        confirmationFeedback = 'Archiving message copied to clipboard. Review it, then paste it into Yelp when ready.';
+        logDebug('Archiving message copied', { company: quote.company });
+      } catch {
+        confirmationFeedback = 'Could not copy the archiving message.';
       }
       render();
     }
