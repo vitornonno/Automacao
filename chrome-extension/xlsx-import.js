@@ -89,7 +89,7 @@
   function windowsFromCell(value) {
     const normalized = String(value || '').trim();
     if (!normalized || /^[—–-]$/.test(normalized)) return [];
-    if (/dia\s+todo/i.test(normalized)) return [{ start: 480, end: 1140 }];
+    if (/dia\s+todo/i.test(normalized)) return [{ start: 510, end: 1140 }];
     const times = [...normalized.matchAll(/\d{1,2}(?::\d{2})?\s*(?:AM|PM)/gi)].map((match) => minutes(match[0])).filter(Number.isFinite);
     if (!times.length) return [];
     return [{ start: times[0], end: times[1] || 1140 }].filter((window) => window.end > window.start);

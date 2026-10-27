@@ -13,14 +13,24 @@
     post_construction: 'Post-Construction Cleaning',
     move_in_out: 'Move-In / Move-Out Cleaning'
   };
+  const DISCOUNT_TARGETS = {
+    regular: 'Regular Cleaning',
+    first_cleaning: 'First Cleaning',
+    deep_cleaning: 'Deep Cleaning',
+    move_in: 'Move-In Cleaning',
+    move_out: 'Move-Out Cleaning',
+    post_construction: 'Post-Construction Cleaning'
+  };
   const COMPANIES = {
     kacs: { name: 'KACS Cleaning Services' },
     jheys: { name: 'Jhey’s Cleaning' },
     dasilva: { name: 'Da Silva Cleaning Services' },
+    utcleans: { name: 'UT Cleans' },
+    marys: { name: "Mary's House Cleaning" },
     gleam: { name: 'Gleam Team Housecleaning' },
     express: { name: 'Express House Cleaning' }
   };
-  const JHEYS_STYLE_COMPANIES = new Set(['jheys', 'dasilva', 'gleam', 'express']);
+  const JHEYS_STYLE_COMPANIES = new Set(['jheys', 'dasilva', 'utcleans', 'marys', 'gleam', 'express']);
 
   const KACS_HOURS = {
     800: [2, 2, 2.5, 3, 1.5, 1.5, 3],
@@ -53,7 +63,7 @@
   };
 
   const SERVICE_INDEX = Object.keys(SERVICES);
-    const INITIAL_LEAD_SERVICE_IDS = ['deep_cleaning', 'first_cleaning', 'move_in_out', 'post_construction'];
+  const INITIAL_LEAD_SERVICE_IDS = ['deep_cleaning', 'first_cleaning', 'move_in', 'move_out', 'post_construction'];
   const BED_BATH_TO_BAND = {
     '1|1': 800, '2|1': 1000, '2|2': 1200, '3|2': 1600,
     // No exact 3-bedroom/3-bathroom row exists; use the conservative viable 1,600 sq. ft. band.
@@ -86,11 +96,60 @@
 
   function resolveService(value, frequency) {
     const directMatch = normalizeService(value);
-      if (directMatch) return ['move_in', 'move_out'].includes(directMatch) ? 'move_in_out' : directMatch;
+    if (directMatch) return directMatch;
     const serviceText = String(value || '').toLowerCase();
     if (!/regular|standard|home cleaning/.test(serviceText)) return null;
     // New leads always begin with a First Cleaning; recurring rates apply later.
     return 'first_cleaning';
+  }
+
+  function recurringCleaningFrequency(serviceType, frequency) {
+    const serviceText = String(serviceType || '').toLowerCase();
+    const frequencyText = String(frequency || '').toLowerCase();
+    if (!/regular|standard|home cleaning/.test(serviceText) || /just once|one[- ]?time|single/.test(frequencyText)) return null;
+    if (/bi[ -]?weekly|every\s*(?:2|two)\s*weeks?|fortnightly/.test(frequencyText)) {
+      return { id: 'biweekly', label: 'Bi-weekly' };
+    }
+    if (/monthly|(?:once|every)\s+(?:a\s+)?month|every\s*(?:4|four)\s*weeks?/.test(frequencyText)) {
+      return { id: 'monthly', label: 'Monthly' };
+    }
+    if (/weekly|(?:once|every)\s+(?:a\s+)?week/.test(frequencyText)) {
+      return { id: 'weekly', label: 'Weekly' };
+    }
+    return { id: null, label: 'Recurring' };
+  }
+
+  function discountedRange(priceRange, percentage) {
+    return {
+      minimum: roundUpToNearestFive(priceRange.minimum * (1 - percentage / 100)),
+      maximum: roundUpToNearestFive(priceRange.maximum * (1 - percentage / 100))
+    };
+  }
+
+  function recurringCleaningQuote(frequency, band, regularDiscountPercent, firstRecurringDiscountPercent) {
+    const minimum = BEGINNER_PRICES[band][SERVICE_INDEX.indexOf(frequency.id)];
+    const standardPriceRange = { minimum, maximum: minimum + 30 };
+    const priceRange = regularDiscountPercent > 0 ? discountedRange(standardPriceRange, regularDiscountPercent) : standardPriceRange;
+    return {
+      ...frequency,
+      priceRange,
+      discount: regularDiscountPercent > 0 ? { percentage: regularDiscountPercent, standardPriceRange } : null,
+      firstRecurringDiscount: firstRecurringDiscountPercent > 0 ? {
+        percentage: firstRecurringDiscountPercent,
+        priceRange: discountedRange(standardPriceRange, firstRecurringDiscountPercent),
+        standardPriceRange
+      } : null
+    };
+  }
+
+  function optionalDiscountPercent(value) {
+    if (value === null || value === undefined || value === '') return null;
+    const percentage = Number(value);
+    return Number.isFinite(percentage) && percentage >= 0 && percentage <= 100 ? percentage : null;
+  }
+
+  function normalizedDiscountTarget(value) {
+    return Object.hasOwn(DISCOUNT_TARGETS, value) ? value : null;
   }
 
   function normalizeNumber(value) {
@@ -101,6 +160,10 @@
 
   function roundToNearestHalfHour(value) {
     return Math.round(Number(value) * 2) / 2;
+  }
+
+  function roundUpToNearestFive(value) {
+    return Math.ceil(Number(value) / 5) * 5;
   }
 
   function conservativeBedBathBand(bedrooms, bathrooms) {
@@ -137,6 +200,8 @@
     if (/\bkacs\b|kacs cleaning services/i.test(companyName || '')) return 'kacs';
     if (/jhey['’]?s cleaning/i.test(companyName || '')) return 'jheys';
     if (/da\s*silva\s+cleaning/i.test(companyName || '')) return 'dasilva';
+    if (/\but\s*cleans?\b/i.test(companyName || '')) return 'utcleans';
+    if (/mary['’]?s\s+house\s+cleaning/i.test(companyName || '')) return 'marys';
     if (/\bgleam\s+team(?:\s+housecleaning)?\b/i.test(companyName || '')) return 'gleam';
     if (/express\s+house\s+cleaning/i.test(companyName || '')) return 'express';
     return 'unknown';
@@ -147,10 +212,21 @@
     const requestedService = normalizeService(lead.serviceType);
     // Only Gleam needs the operational distinction between Move-In and Move-Out:
     // Yelp sends them as one request, so the attendant must select the correct one.
-    const service = company === 'gleam' && ['move_in', 'move_out'].includes(requestedService)
-      ? requestedService
-      : resolveService(lead.serviceType, lead.frequency);
+    const requiresMoveType = requestedService === 'move_in_out';
+    const service = requiresMoveType ? null : resolveService(lead.serviceType, lead.frequency);
     const size = chooseSizeBand(lead);
+    const recurringFrequency = recurringCleaningFrequency(lead.serviceType, lead.frequency);
+    const configuredDiscount = optionalDiscountPercent(options.discountPercent);
+    const discountTarget = normalizedDiscountTarget(options.discountTarget);
+    // A percentage is an explicit request for a discount. If the VA has not
+    // selected a target yet, apply it to the service currently being quoted.
+    const effectiveDiscountTarget = discountTarget || (configuredDiscount > 0 ? service : null);
+    const quotedRecurringFrequency = recurringFrequency && ['monthly', 'biweekly'].includes(recurringFrequency.id);
+    // For a recurring Yelp request, "First Cleaning" means the introductory
+    // discount belongs to the first regular visit after the initial cleaning.
+    const firstRecurringDiscountPercent = service === 'first_cleaning' && quotedRecurringFrequency && effectiveDiscountTarget === 'first_cleaning'
+      ? configuredDiscount
+      : null;
     const base = {
       company,
       service,
@@ -161,6 +237,7 @@
       lead: { ...lead }
     };
 
+    if (requiresMoveType) return { ...base, status: 'move_type_required', reason: 'Select Move-In or Move-Out Cleaning before preparing the quote.' };
     if (!service) return { ...base, status: 'missing_service', reason: 'No supported cleaning type was found.' };
     if (company === 'unknown') return { ...base, status: 'manual_company_required', reason: 'Select a supported company before calculating.' };
     if (size.status === 'missing_size') return { ...base, status: 'missing_size', reason: 'No usable square footage or bedroom/bathroom match was found.' };
@@ -169,11 +246,11 @@
       if (size.status === 'over_limit') {
         return { ...base, status: 'manual_hours_required', hourlyRate: 100, reason: 'Homes above 3,000 sq. ft. require a human time estimate.' };
       }
-        const moveInOut = service === 'move_in_out';
-        const rawBaseHours = moveInOut
-          ? (KACS_HOURS[size.band][SERVICE_INDEX.indexOf('move_in')] + KACS_HOURS[size.band][SERVICE_INDEX.indexOf('move_out')]) / 2
-          : KACS_HOURS[size.band][SERVICE_INDEX.indexOf(service)];
+        const rawBaseHours = KACS_HOURS[size.band][SERVICE_INDEX.indexOf(service)];
       const baseHours = roundToNearestHalfHour(rawBaseHours);
+      const recurringCleaning = quotedRecurringFrequency
+        ? recurringCleaningQuote(recurringFrequency, size.band, effectiveDiscountTarget === 'regular' ? configuredDiscount : null, firstRecurringDiscountPercent)
+        : recurringFrequency;
       return {
         ...base,
         quoteType: 'time_only',
@@ -181,34 +258,36 @@
         baseHours,
         toleranceHours: 1.5,
         estimatedHours: { minimum: baseHours, maximum: baseHours + 1.5 },
+        recurringCleaning,
         pricingDisclosure: 'hourly_recommended',
         status: 'ready_for_review'
       };
     }
 
     if (size.status === 'over_limit') return { ...base, status: 'manual_quote_required', reason: 'Homes above 3,000 sq. ft. require a human quote.' };
-      const moveInOut = service === 'move_in_out';
-      const baseAmount = moveInOut
-        ? Math.round((BEGINNER_PRICES[size.band][SERVICE_INDEX.indexOf('move_in')] + BEGINNER_PRICES[size.band][SERVICE_INDEX.indexOf('move_out')]) / 2)
-        : BEGINNER_PRICES[size.band][SERVICE_INDEX.indexOf(service)];
-      // Move-in and Move-out share the preliminary combined quote, but Gleam's
-      // discount is offered only when the customer specifically requested Move-in.
-      const gleamDiscountApplies = company === 'gleam' && ['first_cleaning', 'deep_cleaning', 'move_in'].includes(service);
-      const amount = gleamDiscountApplies ? Math.round(baseAmount * 0.85) : baseAmount;
+      const baseAmount = BEGINNER_PRICES[size.band][SERVICE_INDEX.indexOf(service)];
+      const discountApplies = configuredDiscount !== null && configuredDiscount > 0 && effectiveDiscountTarget === service && !firstRecurringDiscountPercent;
+      const amount = discountApplies
+        ? roundUpToNearestFive(baseAmount * (1 - configuredDiscount / 100))
+        : baseAmount;
+      const recurringCleaning = quotedRecurringFrequency
+        ? recurringCleaningQuote(recurringFrequency, size.band, effectiveDiscountTarget === 'regular' ? configuredDiscount : null, firstRecurringDiscountPercent)
+        : recurringFrequency;
       return {
       ...base,
       quoteType: 'fixed_price',
         amount,
-      discount: gleamDiscountApplies ? { percentage: 15, amount: baseAmount - amount } : null,
+      discount: discountApplies ? { percentage: configuredDiscount, amount: baseAmount - amount } : null,
       priceRange: {
           minimum: amount,
           maximum: amount + 100
       },
       currency: 'USD',
+      recurringCleaning,
       status: 'ready_for_review'
     };
   }
 
-  global.CleaningQuoteEngine = { calculateQuote, chooseSizeBand, normalizeService, resolveService, resolveCompany, roundToNearestHalfHour, conservativeBedBathBand, SERVICES, COMPANIES, JHEYS_STYLE_COMPANIES, SIZE_BANDS, INITIAL_LEAD_SERVICE_IDS };
+  global.CleaningQuoteEngine = { calculateQuote, chooseSizeBand, normalizeService, resolveService, recurringCleaningFrequency, optionalDiscountPercent, normalizedDiscountTarget, resolveCompany, roundToNearestHalfHour, roundUpToNearestFive, conservativeBedBathBand, SERVICES, DISCOUNT_TARGETS, COMPANIES, JHEYS_STYLE_COMPANIES, SIZE_BANDS, INITIAL_LEAD_SERVICE_IDS };
   if (typeof module !== 'undefined') module.exports = global.CleaningQuoteEngine;
 })(typeof globalThis !== 'undefined' ? globalThis : window);

@@ -3,9 +3,12 @@
 
   function hours(value) { return Number.isInteger(value) ? String(value) : Number(value).toFixed(1); }
   function greeting(name) { return name ? `Hi ${name},` : 'Hi,'; }
+  function countLabel(value, singular, plural) {
+    return `${value || '?'} ${Number(value) === 1 ? singular : plural}`;
+  }
   function homeDetails(lead) {
     const items = [];
-    if (lead.bedrooms || lead.bathrooms) items.push(`🏠 Home: ${lead.bedrooms || '?'} Bedrooms / ${lead.bathrooms || '?'} Bathrooms`);
+    if (lead.bedrooms || lead.bathrooms) items.push(`🏠 Home: ${countLabel(lead.bedrooms, 'Bedroom', 'Bedrooms')} / ${countLabel(lead.bathrooms, 'Bathroom', 'Bathrooms')}`);
     if (lead.squareFeet) items.push(`📐 Approximate Size: ${lead.squareFeet} sq. ft.`);
     if (lead.cleaningProducts) items.push(`🍃 Cleaning Products: ${lead.cleaningProducts}`);
     if (lead.extraServices && !/^not sure$/i.test(String(lead.extraServices).trim())) items.push(`🧽 Additional Services Requested: ${lead.extraServices}`);
@@ -22,6 +25,29 @@
       '',
       'Upon arrival, our team will perform a brief walkthrough of the property and provide a more accurate estimate of the expected cleaning time before work begins.'
     ];
+  }
+  function recurringCleaningSection(quote) {
+    const recurring = quote?.recurringCleaning;
+    if (!recurring) return [];
+    const cadence = recurring.label || 'Recurring';
+    const cadenceTitle = /^regular$/i.test(cadence) ? 'REGULAR CLEANING' : `${cadence.toUpperCase()} REGULAR CLEANING`;
+    const section = [
+      `🔄 AFTER THE FIRST CLEANING — ${cadenceTitle}`,
+      '',
+      `Once the First Cleaning has been completed, we can transition to a fixed recurring rate for ${cadence.toLowerCase()} service.`
+    ];
+    if (recurring.priceRange) {
+      section.push('', `💲 ${cadence} Regular Cleaning: approximately $${recurring.priceRange.minimum} - $${recurring.priceRange.maximum} per visit`);
+    }
+    if (recurring.discount?.percentage) {
+      section.push(`✨ ${recurring.discount.percentage}% regular-cleaning discount applied`);
+    }
+    if (recurring.firstRecurringDiscount?.priceRange) {
+      const discount = recurring.firstRecurringDiscount;
+      section.push('', `✨ ${discount.percentage}% new customer discount on your first ${cadence.toLowerCase()} regular cleaning: approximately $${discount.priceRange.minimum} - $${discount.priceRange.maximum} per visit. Future regular cleanings return to $${discount.standardPriceRange.minimum} - $${discount.standardPriceRange.maximum} per visit.`);
+    }
+    section.push('', 'The exact recurring rate will be confirmed after the First Cleaning.');
+    return section;
   }
   function serviceLimitations(lead) {
     const requested = String(lead?.extraServices || '').toLowerCase();
@@ -303,6 +329,19 @@
       ] }
     ]
   };
+  function daSilvaStyleFollowUps(companyName, phone) {
+    return situationalFollowUps.dasilva.map((situation) => ({
+      ...situation,
+      messages: situation.messages.map((item) => ({
+        ...item,
+        message: (name, lead) => item.message(name, lead)
+          .replaceAll('Da Silva Cleaning Services', companyName)
+          .replaceAll('(925) 515-3121', phone)
+      }))
+    }));
+  }
+  situationalFollowUps.utcleans = daSilvaStyleFollowUps('UT Cleans', '(925) 202-0504');
+  situationalFollowUps.marys = daSilvaStyleFollowUps("Mary's House Cleaning", '(925) 905-8387');
   function situationalFollowUpStatus(company, lead, conversationText) {
     const situations = situationalFollowUps[company];
     if (!situations) return null;
@@ -342,6 +381,14 @@
       "If you ever need professional cleaning in the future, simply reach out again—we'll be happy to prepare a new quote and assist you.", '',
       'We appreciate the opportunity and hope to work with you someday.', '',
       'Da Silva Cleaning Services', '📞 (925) 515-3121'
+    ].join('\n');
+    if (company === 'utcleans') return [
+      `Hi ${name}, thank you for considering UT Cleans and for giving us the opportunity to assist you.`, '',
+      "Since we haven't heard back from you, we'll close your request for now. If you'd like to schedule a cleaning with us in the future, we'd be more than happy to help. You can submit a new request or contact us directly at 📞 (925) 202-0504.", '',
+      'We truly appreciate your interest and wish you all the best!', '', 'Warm regards,', 'UT Cleans', '📞 (925) 202-0504'
+    ].join('\n');
+    if (company === 'marys') return [
+      `Hi ${name}! 😊`, '', "Thank you for considering Mary's House Cleaning.", '', "Since we haven't heard back, we'll go ahead and close your request for now.", '', "If you decide you'd like to schedule a cleaning with us in the future, you're always welcome to reach out again. We'd be happy to assist you whenever you're ready!", '', 'We appreciate your interest in our services and wish you all the best.', '', 'Warm regards,', "Mary's House Cleaning", '📞 (925) 905-8387'
     ].join('\n');
     if (company === 'gleam') return [
       `Hi ${name}! We hadn't heard back, so we're going to leave this one here for now.`, '',
@@ -385,14 +432,11 @@
       message.push('', "We'd be happy to help with your cleaning service. Since this would be your first cleaning with our company, we recommend starting with a First Cleaning. This initial visit allows us to become familiar with your home and establish a cleaning baseline before any future maintenance visits.");
     } else if (service === 'deep_cleaning') {
       message.push('', "We'd be happy to help with your one-time Deep Cleaning service.");
-    } else if (service === 'move_in_out') {
-      message.push('', "We'd be delighted to assist with your Move-In / Move-Out Cleaning. To make the estimate more accurate and fair, could you please confirm whether this is a move-in or move-out cleaning?");
     }
     if (details.length) message.push('', 'Based on the information you provided:', '', ...details);
     message.push('', `🧼 ${quote.serviceLabel.toUpperCase()}`, '', ...hourlyEstimate(quote));
-    if (service === 'move_in_out') {
-      message.push('', '✅ Our Move-In / Move-Out Cleaning includes:', '', '• Inside oven cleaning', '• Inside refrigerator cleaning', '• Interior cleaning of cabinets and drawers', '• Reachable interior window cleaning', '• Detailed cleaning of bathrooms, kitchen, bedrooms, and common areas');
-    }
+    const recurring = recurringCleaningSection(quote);
+    if (recurring.length) message.push('', ...recurring);
     const limitations = serviceLimitations(lead);
     if (limitations.length) message.push('', ...separatedParagraphs(limitations));
     const availability = selectedAvailability(review);
@@ -462,10 +506,11 @@
     message.push(
       '',
       `🧼 Recommended service: ${quote.serviceLabel || 'Cleaning'}`,
-      `💲 Estimated investment: $${quote.priceRange?.minimum ?? quote.amount} to $${quote.priceRange?.maximum ?? Number(quote.amount || 0) + 100}`,
-      '✨ Introductory pricing for new clients'
+      `💲 Estimated investment: $${quote.priceRange?.minimum ?? quote.amount} to $${quote.priceRange?.maximum ?? Number(quote.amount || 0) + 100}`
     );
-    if (quote.service === 'move_in_out') message.push('', 'To make this estimate more accurate and fair, could you please confirm whether the service is for a move-in or move-out?');
+    if (quote.discount?.percentage) message.push(`✨ ${quote.discount.percentage}% new customer discount applied`);
+    const recurring = recurringCleaningSection(quote);
+    if (recurring.length) message.push('', ...recurring);
     const limitations = serviceLimitations(lead);
     if (limitations.length) message.push('', ...separatedParagraphs(limitations));
     const availability = selectedAvailability(review);
@@ -475,7 +520,6 @@
       '👥 Team: 2 professional cleaners',
       '',
       'This first visit provides a thorough foundation, allowing future appointments to be more efficient, consistent, and budget-friendly.',
-      'Upon arrival, our team will complete a quick walkthrough to confirm the scope of work and final price before beginning.',
       ...(noAvailabilityFollowUp(review).length ? ['', ...noAvailabilityFollowUp(review)] : []),
       '',
       'We would be delighted to welcome you to Jhey’s Cleaning. Please let us know if you would like to proceed or have any questions.',
@@ -489,6 +533,8 @@
 
   const fixedPriceCompanies = {
     dasilva: { name: 'Da Silva Cleaning Services', phone: '(925) 515-3121' },
+    utcleans: { name: 'UT Cleans', phone: '(925) 202-0504' },
+    marys: { name: "Mary's House Cleaning", phone: '(925) 905-8387' },
     gleam: { name: 'Gleam Team Housecleaning', shortName: 'Gleam Team', phone: '(925) 515-5461' },
     express: { name: 'Express House Cleaning', phone: '(510) 757-9573' }
   };
@@ -506,6 +552,11 @@
     const message = [greeting(lead.customerName), ''];
     if (quote.company === 'dasilva') {
       message.push(`Thank you for reaching out to ${company.name}! 😊`, '', "Based on your home's size, here's our estimate:", '', `🧼 Recommended Service: ${quote.serviceLabel}`, ...homeDetails(lead), `💰 Estimated Price: ${price}`, '', "The final price will depend on the home's current condition and the level of detail required.");
+    } else if (quote.company === 'utcleans') {
+      message.push(`Thank you for providing your home details. For your home, here is what we suggest:`, '', `🧼 Initial Service: ${quote.serviceLabel}`, `💲 First Visit Estimate: ${price}`, '👥 Dedicated Team: 2 cleaners', '', 'Our first service focuses on creating a fresh baseline throughout your space, allowing future maintenance cleanings to be streamlined, consistent, and budget-friendly.');
+    } else if (quote.company === 'marys') {
+      const priceLabel = quote.discount?.percentage ? '💲 Special first-cleaning price' : '💲 Estimated price';
+      message.push(`Thank you for providing the details about your home. We truly appreciate the information!`, '', `🧼 Recommended service: ${quote.serviceLabel}`, ...homeDetails(lead), `${priceLabel}: ${price}`, '', 'The final price may depend on the overall condition of the home and the level of cleaning required.', '', 'Our first visit is designed to establish a thorough cleaning foundation, making future maintenance cleanings more efficient and consistent.', '', 'Would you like us to check availability for your preferred date?');
     } else if (quote.company === 'gleam') {
       message.push(`Thank you for reaching out to ${company.shortName}! 😊`, '', "Based on what you shared, here's our estimate for your home:", '', `🧽 ${quote.serviceLabel}`, `💲 Estimated price: ${price}`);
       if (quote.discount?.percentage) message.push(`✨ ${quote.discount.percentage}% discount applied to this initial cleaning`);
@@ -513,11 +564,16 @@
     } else {
       message.push('Thank you so much for contacting Express House Cleaning! We truly appreciate your interest in our services.', '', "Based on the information provided, here's our estimate for your home:", '', `🧼 ${quote.serviceLabel}`, '', `💲 Estimated price: ${price}`, '👥 Team: 2 professional cleaners', '', "The final price will depend on the home's overall condition and the level of detail required.");
     }
-    if (quote.service === 'move_in_out') message.push('', 'To make the estimate more accurate and fair, please confirm whether the service is for a move-in or move-out.');
+    if (quote.discount?.percentage) message.push(`✨ ${quote.discount.percentage}% new customer discount applied`);
+    const recurring = recurringCleaningSection(quote);
+    if (recurring.length) message.push('', ...recurring);
     const limitations = serviceLimitations(lead); if (limitations.length) message.push('', ...separatedParagraphs(limitations));
     const availability = selectedAvailability(review); if (availability.length) message.push('', ...availability);
     const noAvailability = noAvailabilityFollowUp(review); if (noAvailability.length) message.push('', ...noAvailability);
-    message.push('', 'Please let us know if you have any questions or would like to schedule your cleaning. We’d be happy to help! 😊', '', company.name, `📞 ${company.phone}`);
+    message.push('', 'Please let us know if you have any questions or would like to schedule your cleaning. We’d be happy to help! 😊', '');
+    if (quote.company === 'marys') message.push('Warm regards,', company.name, `📞 ${company.phone}`);
+    else if (quote.company === 'utcleans') message.push('Best regards,', company.name, `📞 ${company.phone}`);
+    else message.push(company.name, `📞 ${company.phone}`);
     return message.join('\n');
   }
 

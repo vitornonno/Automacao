@@ -9,7 +9,7 @@ const relayStatusElement = document.querySelector('#relay-status');
 const prestoStatusElement = document.querySelector('#presto-status');
 const prestoDebugOutput = document.querySelector('#presto-debug-output');
 let prestoDebug = null;
-let selectedFilter = 'pending_human_approval';
+let selectedFilter = 'all';
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]);
@@ -77,6 +77,7 @@ function card(review) {
     <div class="actions">
       ${href ? `<a href="${escapeHtml(href)}" target="_blank" rel="noreferrer">Open lead</a>` : ''}
       ${review.state === 'pending_human_approval' ? '<button data-state="approved">Approve</button><button data-state="adjusted">Mark adjusted</button><button class="quiet" data-state="discarded">Discard</button>' : ''}
+      <button class="quiet" data-remove-lead="true">Remove</button>
     </div>
   </article>`;
 }
@@ -91,6 +92,21 @@ async function loadReviews() {
 reviewsElement.addEventListener('click', async (event) => {
   const state = event.target.dataset.state;
   const reviewCard = event.target.closest('[data-id]');
+  if (event.target.dataset.removeLead && reviewCard) {
+    const id = reviewCard.dataset.id;
+    const name = reviewCard.querySelector('strong')?.textContent || 'this lead';
+    if (!window.confirm(`Remove ${name} from the local queue? This cannot be undone.`)) return;
+    event.target.disabled = true;
+    try {
+      await chrome.storage.local.remove(`lead:${id}`);
+      await loadReviews();
+      summaryElement.textContent = `${name} removed from the local queue.`;
+    } catch {
+      summaryElement.textContent = 'Could not remove this lead from the local queue.';
+      event.target.disabled = false;
+    }
+    return;
+  }
   if (!state && reviewCard && !event.target.closest('button, a')) {
     const records = await chrome.storage.local.get(`lead:${reviewCard.dataset.id}`);
     const review = records[`lead:${reviewCard.dataset.id}`];
@@ -112,25 +128,6 @@ reviewsElement.addEventListener('click', async (event) => {
   await loadReviews();
 });
 document.querySelector('#refresh').addEventListener('click', loadReviews);
-document.querySelector('#clear-queue').addEventListener('click', async (event) => {
-  const records = await chrome.storage.local.get(null);
-  const keys = Object.keys(records).filter((key) => key.startsWith('lead:'));
-  if (!keys.length) {
-    summaryElement.textContent = 'The queue is already empty.';
-    return;
-  }
-  if (!window.confirm(`Clear all ${keys.length} saved lead${keys.length === 1 ? '' : 's'} from the local queue? This cannot be undone.`)) return;
-  event.target.disabled = true;
-  try {
-    await chrome.storage.local.remove(keys);
-    await loadReviews();
-    summaryElement.textContent = `${keys.length} saved lead${keys.length === 1 ? '' : 's'} removed from the local queue.`;
-  } catch {
-    summaryElement.textContent = 'Could not clear the local queue.';
-  } finally {
-    event.target.disabled = false;
-  }
-});
 document.querySelectorAll('.filter').forEach((button) => button.addEventListener('click', () => {
   selectedFilter = button.dataset.filter;
   document.querySelectorAll('.filter').forEach((item) => item.classList.toggle('active', item === button));
@@ -262,6 +259,7 @@ const manualFields = {
   company: document.querySelector('#manual-company'), name: document.querySelector('#manual-name'),
   service: document.querySelector('#manual-service'), squareFeet: document.querySelector('#manual-square-feet'),
   bedrooms: document.querySelector('#manual-bedrooms'), bathrooms: document.querySelector('#manual-bathrooms'),
+  discount: document.querySelector('#manual-discount'), discountTarget: document.querySelector('#manual-discount-target'),
   location: document.querySelector('#manual-location'), extraServices: document.querySelector('#manual-extra-services'),
   products: document.querySelector('#manual-products')
 };
@@ -285,7 +283,7 @@ function manualLead() {
     cleaningProducts: manualFields.products.value.trim() || null
   };
 }
-function manualQuote() { return CleaningQuoteEngine.calculateQuote(manualLead(), { companyOverride: manualFields.company.value }); }
+function manualQuote() { return CleaningQuoteEngine.calculateQuote(manualLead(), { companyOverride: manualFields.company.value, discountPercent: manualFields.discount.value.trim(), discountTarget: manualFields.discountTarget.value }); }
 function manualDuration(quote) {
   if (quote.estimatedHours) return Math.round(quote.estimatedHours.maximum * 60);
   const hours = Number(quote.priceRange?.maximum || quote.amount || 0) / 100;
@@ -371,9 +369,11 @@ async function findManualAvailability() {
   const importedAvailability = (await chrome.storage.local.get(availabilityKey))[availabilityKey];
   const byDay = Object.groupBy(snapshot.jobs, (job) => job.date);
   const cleaners = [...new Set(snapshot.jobs.flatMap((job) => Array.isArray(job.cleaners) ? job.cleaners : []).filter(Boolean))];
-  // KACS offers availability from Rafael's calendar only; jobs on the other
-  // teams must not remove an otherwise valid Rafael opening.
-  const scheduleCleaners = quote.company === 'kacs' ? ['Rafael'] : cleaners;
+  // These companies have one operational route for quoting availability.
+  // Do not treat a secondary/helper assignment as an independent team.
+  const primaryCleaner = { kacs: 'Rafael', jheys: 'Jheyce' }[quote.company] || null;
+  const scheduleCleaners = primaryCleaner ? [primaryCleaner] : cleaners;
+  const workdayStart = CleaningCleanerAvailability.DAY_START;
   if (!scheduleCleaners.length) throw new Error('This Presto scan has no cleaner assignments. Reload the extension and read the schedule again.');
   const startDate = new Date(`${snapshot.range.start}T12:00:00Z`);
   const endDate = new Date(`${snapshot.range.end}T12:00:00Z`);
@@ -387,20 +387,20 @@ async function findManualAvailability() {
     if (new Date(`${day}T12:00:00`).getDay() === 0) continue;
     options.push(...CleaningCleanerAvailability.importedSlots(importedAvailability, day, duration));
     const dayJobs = byDay[day] || [];
-    const scheduledJobs = quote.company === 'kacs'
-      ? dayJobs.filter((job) => Array.isArray(job.cleaners) && job.cleaners.includes('Rafael'))
+    const scheduledJobs = primaryCleaner
+      ? dayJobs.filter((job) => Array.isArray(job.cleaners) && job.cleaners.includes(primaryCleaner))
       : dayJobs;
     if (scheduledJobs.some((job) => !job.coordinates || !Number.isFinite(job.price) || !job.startTime || !Array.isArray(job.cleaners) || !job.cleaners.length)) continue;
-    const cleaner = quote.company === 'kacs'
-      ? 'Rafael'
+    const cleaner = primaryCleaner
+      ? primaryCleaner
       : [...scheduleCleaners].sort((left, right) => dayJobs.filter((job) => job.cleaners.includes(left)).length - dayJobs.filter((job) => job.cleaners.includes(right)).length)[0];
     const jobs = scheduledJobs.filter((job) => job.cleaners.includes(cleaner)).sort((a, b) => String(a.startTime).localeCompare(String(b.startTime)));
     for (let index = 0; index <= jobs.length; index += 1) {
       const previous = jobs[index - 1]; const next = jobs[index];
-      let start = 480;
+      let start = workdayStart;
       if (previous) {
         const [hour, minute] = previous.startTime.split(':').map(Number);
-        start = hour * 60 + minute + manualPriceDuration(previous.price, quote.company) + 30 + await manualRouteMinutes(previous.coordinates, destination);
+        start = Math.max(workdayStart, hour * 60 + minute + manualPriceDuration(previous.price, quote.company) + 30 + await manualRouteMinutes(previous.coordinates, destination));
       }
       start = Math.ceil(start / 30) * 30;
       if (start + duration > 1140) continue;

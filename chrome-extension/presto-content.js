@@ -50,6 +50,8 @@ function detectedCompany() {
   if (/\bkacs\b/.test(normalized)) return { key: 'kacs', name };
   if (/\bjhey.?s\b/.test(normalized)) return { key: 'jheys', name };
   if (/da\s*silva\s+cleaning/.test(normalized)) return { key: 'dasilva', name };
+  if (/\but\s*cleans?\b/.test(normalized)) return { key: 'utcleans', name };
+  if (/mary.?s\s+house\s+cleaning/.test(normalized)) return { key: 'marys', name };
   if (/gleam\s+team\s+housecleaning/.test(normalized)) return { key: 'gleam', name };
   if (/express\s+house\s+cleaning/.test(normalized)) return { key: 'express', name };
   return { key: null, name: name || null };
@@ -199,9 +201,11 @@ async function readOpenedJobDetails(timeoutMilliseconds = 3000) {
     const card = openedServiceCard();
     if (card) {
       details = selectedJobDetails(card);
-      // A price or map link confirms that the asynchronously rendered card has
-      // populated its service details. This matters for the Jhey's card layout.
-      if (details.coordinates || Number.isFinite(details.price)) return details;
+      // Some Presto cards render the price before the address/map link. Keep
+      // polling until the coordinates arrive, otherwise a routable job can be
+      // saved prematurely without its location. Jobs genuinely without a map
+      // still return their captured details at the timeout.
+      if (details.coordinates) return details;
     }
     await sleep(125);
   }

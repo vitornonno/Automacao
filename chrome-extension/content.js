@@ -3,7 +3,10 @@
   'use strict';
 
   let companyOverride = null;
+  let discountPercent = '';
+  let discountTarget = '';
   let lead = null;
+  let originalServiceType = null;
   let quote = null;
   let queueMode = false;
   let queueReviews = new Map();
@@ -41,7 +44,15 @@
         cleaningProducts: currentLead.cleaningProducts,
         extraServices: currentLead.extraServices
       } : null,
-      quote: currentQuote ? { status: currentQuote.status, service: currentQuote.service, size: currentQuote.size, company: currentQuote.company } : null,
+      quote: currentQuote ? {
+        status: currentQuote.status,
+        service: currentQuote.service,
+        size: currentQuote.size,
+        company: currentQuote.company,
+        discount: currentQuote.discount || null,
+        recurringCleaning: currentQuote.recurringCleaning || null
+      } : null,
+      discountInput: { percentage: discountPercent || null, appliesTo: discountTarget || null },
       existingReview: existingReview ? { state: existingReview.state, savedAt: existingReview.savedAt, updatedAt: existingReview.updatedAt } : null,
       events: debugEvents
     };
@@ -88,6 +99,8 @@
     if (!force && route === activeRoute && root.isConnected) return;
     activeRoute = route;
     companyOverride = null;
+    discountPercent = '';
+    discountTarget = '';
     queueMode = false;
     queueFeedback = '';
     existingReview = null;
@@ -95,9 +108,10 @@
     selectedAvailability = new Set();
     confirmationFeedback = '';
     lead = CleaningLeadExtractor.extractLead();
+    originalServiceType = lead?.serviceType || null;
     requestedDetails = new Set(['squareFeet', 'bedrooms', 'bathrooms'].filter((field) => !String(lead?.[field] || '').trim()));
     detailsRequestOpen = false;
-    quote = CleaningQuoteEngine.calculateQuote(lead);
+    quote = CleaningQuoteEngine.calculateQuote(lead, { discountPercent, discountTarget });
     logDebug('Capture attempt', captureSnapshot(lead, quote).lead || {});
     if (!root.isConnected) document.documentElement.append(root);
     render();
@@ -127,6 +141,7 @@
       logDebug('Cleaning type retry', captureSnapshot(retryLead, retryQuote).lead || {});
       if (CleaningQuoteEngine.resolveService(retryLead?.serviceType, retryLead?.frequency)) {
         lead = retryLead;
+        originalServiceType = lead.serviceType || null;
         quote = retryQuote;
         logDebug('Cleaning type resolved after retry', { service: quote.service, source: lead.captureSource });
         render();
@@ -190,9 +205,11 @@
       const grouped = Object.groupBy(snapshot.jobs, (job) => job.date);
       const importedAvailability = saved[availabilityStorageKey];
       const cleaners = [...new Set(snapshot.jobs.flatMap((job) => Array.isArray(job.cleaners) ? job.cleaners : []).filter(Boolean))];
-      // KACS availability is intentionally based on Rafael's route only. Other
-      // teams can be working at the same time without consuming Rafael's slot.
-      const scheduleCleaners = quote.company === 'kacs' ? ['Rafael'] : cleaners;
+      // These companies have one operational route for quoting availability.
+      // Do not treat a secondary/helper assignment as an independent team.
+      const primaryCleaner = { kacs: 'Rafael', jheys: 'Jheyce' }[quote.company] || null;
+      const scheduleCleaners = primaryCleaner ? [primaryCleaner] : cleaners;
+      const workdayStart = CleaningCleanerAvailability.DAY_START;
       if (!scheduleCleaners.length) throw new Error('This Presto scan has no cleaner assignments. Reload the extension and read the schedule again.');
         const options = []; const unavailableDays = []; const availabilityDebug = [];
       for (const day of dateRange(snapshot.range.start, snapshot.range.end)) {
@@ -204,34 +221,34 @@
           const importedSlots = CleaningCleanerAvailability.importedSlots(importedAvailability, day, duration);
           options.push(...importedSlots);
           const dayJobs = grouped[day] || [];
-          const scheduledJobs = quote.company === 'kacs'
-            ? dayJobs.filter((job) => Array.isArray(job.cleaners) && job.cleaners.includes('Rafael'))
+          const scheduledJobs = primaryCleaner
+            ? dayJobs.filter((job) => Array.isArray(job.cleaners) && job.cleaners.includes(primaryCleaner))
             : dayJobs;
           if (scheduledJobs.some((job) => !job.coordinates || !Number.isFinite(job.price) || job.price <= 0 || !Array.isArray(job.cleaners) || !job.cleaners.length)) {
             if (!importedSlots.length) unavailableDays.push(day);
             availabilityDebug.push({ day, result: 'unavailable', reason: 'A Rafael job is missing a location, price, or cleaner assignment.' });
             continue;
           }
-          const cleaner = quote.company === 'kacs'
-            ? 'Rafael'
+          const cleaner = primaryCleaner
+            ? primaryCleaner
             : [...scheduleCleaners].sort((left, right) => dayJobs.filter((job) => job.cleaners.includes(left)).length - dayJobs.filter((job) => job.cleaners.includes(right)).length)[0];
           const jobs = scheduledJobs.filter((job) => job.cleaners.includes(cleaner)).sort((a, b) => minutes(a.startTime) - minutes(b.startTime));
         const candidates = [];
           if (!jobs.length) {
-            candidates.push({ cleaner, start: 480, previous: null, next: null });
-            availabilityDebug.push({ day, cleaner, result: 'candidate', start: 480, reason: 'No scheduled jobs for this cleaner; no between-job route is required.' });
-            options.push({ day, cleaner, start: 480, previous: null, next: null });
+            candidates.push({ cleaner, start: workdayStart, previous: null, next: null });
+            availabilityDebug.push({ day, cleaner, result: 'candidate', start: workdayStart, reason: 'No scheduled jobs for this cleaner; no between-job route is required.' });
+            options.push({ day, cleaner, start: workdayStart, previous: null, next: null });
             continue;
           }
         for (let i = 0; i <= jobs.length; i += 1) {
-          const previous = jobs[i - 1]; const next = jobs[i]; let start = 480;
+          const previous = jobs[i - 1]; const next = jobs[i]; let start = workdayStart;
             let routeBefore = null; let routeAfter = null;
             let previousEnd = null; let previousDuration = null;
             if (previous) {
               previousDuration = priceDurationMinutes(previous.price);
               previousEnd = minutes(previous.startTime) + previousDuration;
               routeBefore = await routeMinutes(previous.coordinates, destination);
-              start = previousEnd + 30 + routeBefore;
+              start = Math.max(workdayStart, previousEnd + 30 + routeBefore);
             }
           start = ceilHalfHour(start);
             if (next) {
@@ -340,7 +357,9 @@
   }
   function canRegenerateReview() { return Boolean(existingReview) && (existingReview.state === 'discarded' || reviewHasWrongCompany(existingReview) || reviewHasMoreCompleteDetails(existingReview)); }
   function blocksSaveForApproval() { return Boolean(existingReview) && !canRegenerateReview(); }
-  function canCopyApprovedMessage() { return ['approved', 'adjusted'].includes(existingReview?.state); }
+  function canCopyApprovedMessage() {
+    return quote?.status === 'ready_for_review' || (Object.hasOwn(CleaningQuoteEngine.COMPANIES, quote?.company) && quote?.status === 'missing_size');
+  }
   function input(label, value, key, type = 'text') {
     return `<label>${label}<input data-field="${key}" type="${type}" value="${value ?? ''}"></label>`;
   }
@@ -349,16 +368,12 @@
   }
   function serviceSelector(value) {
     const normalized = CleaningQuoteEngine.normalizeService(value);
-    const current = quote?.company === 'gleam' && ['move_in', 'move_out'].includes(normalized)
-      ? normalized
-      : CleaningQuoteEngine.resolveService(value, lead.frequency) || '';
-    const availableServices = quote?.company === 'gleam'
-      ? [...CleaningQuoteEngine.INITIAL_LEAD_SERVICE_IDS, 'move_in', 'move_out']
-      : CleaningQuoteEngine.INITIAL_LEAD_SERVICE_IDS;
+    const current = normalized === 'move_in_out' ? '' : CleaningQuoteEngine.resolveService(value, lead.frequency) || '';
+    const availableServices = CleaningQuoteEngine.INITIAL_LEAD_SERVICE_IDS;
     const options = Object.entries(CleaningQuoteEngine.SERVICES).filter(([id]) => availableServices.includes(id))
       .map(([id, label]) => `<option value="${id}" ${id === current ? 'selected' : ''}>${label}</option>`).join('');
-    const gleamMoveNote = quote?.company === 'gleam' && current === 'move_in_out' ? '<small>For Gleam, select Move-in or Move-out before quoting. The 15% discount applies only to Move-in.</small>' : '';
-    return `<label>Cleaning type<select data-field="serviceType"><option value="">Select cleaning type</option>${options}</select>${gleamMoveNote}</label>`;
+    const moveTypeNote = normalized === 'move_in_out' ? '<small>Select Move-in or Move-out before the quote can be calculated.</small>' : '';
+    return `<label>Cleaning type<select data-field="serviceType"><option value="">Select cleaning type</option>${options}</select>${moveTypeNote}</label>`;
   }
   function conversationText() {
     const conversation = document.querySelector('main') || document.body;
@@ -404,8 +419,8 @@
           : `<p class="existing-review">This quote was already ${escapeHtml(existingReview.state.replaceAll('_', ' '))}. Open the saved quotes list to copy its message again.</p>`
       : '';
     const copyLabel = availability?.status === 'ready'
-      ? `Copy approved message (${selectedAvailability.size} date${selectedAvailability.size === 1 ? '' : 's'})`
-      : 'Copy approved message';
+      ? `Copy quote message (${selectedAvailability.size} date${selectedAvailability.size === 1 ? '' : 's'})`
+      : 'Copy quote message';
     const primaryAction = quote.status === 'missing_size'
       ? detailsRequestOpen
         ? `<button data-action="copy-details-request" ${requestedDetails.size ? '' : 'disabled'}>Copy selected details request</button>`
@@ -419,6 +434,7 @@
       <section class="lead-fields">
         ${input('Company name', lead.companyName, 'companyName')}
         <label>Company pricing<select data-field="companyOverride"><option value="">Auto-detect</option>${Object.entries(CleaningQuoteEngine.COMPANIES).map(([key, company]) => `<option value="${key}" ${companyOverride === key ? 'selected' : ''}>${escapeHtml(company.name)}</option>`).join('')}</select></label>
+        ${quote.company !== 'unknown' ? `<label>Discount applies to<select data-field="discountTarget"><option value="">No discount</option>${Object.entries(CleaningQuoteEngine.DISCOUNT_TARGETS).map(([key, label]) => `<option value="${key}" ${discountTarget === key ? 'selected' : ''}>${escapeHtml(label)}</option>`).join('')}</select></label><label>Discount %<input data-field="discountPercent" type="number" min="0" max="100" step="1" value="${escapeHtml(discountPercent)}" placeholder="Optional"></label>` : ''}
         ${serviceSelector(lead.serviceType)}
         ${input('Square feet', lead.squareFeet, 'squareFeet', 'number')}
         ${input('Bedrooms', lead.bedrooms, 'bedrooms', 'number')}
@@ -484,10 +500,22 @@
   async function recalculate() {
     root.querySelectorAll('[data-field]').forEach((field) => {
       if (field.dataset.field === 'companyOverride') companyOverride = field.value || null;
-      else if (field.dataset.field === 'serviceType') lead[field.dataset.field] = CleaningQuoteEngine.SERVICES[field.value] || null;
+      else if (field.dataset.field === 'discountPercent') discountPercent = field.value.trim();
+      else if (field.dataset.field === 'discountTarget') discountTarget = field.value || '';
+      else if (field.dataset.field === 'serviceType') {
+        const selectedServiceType = CleaningQuoteEngine.SERVICES[field.value] || null;
+        const isRecurringLead = Boolean(CleaningQuoteEngine.recurringCleaningFrequency(originalServiceType, lead.frequency));
+        // The selector displays First Cleaning for recurring leads, but the
+        // original Yelp wording carries the cadence needed for recurring rates.
+        if (field.value === 'first_cleaning' && isRecurringLead) lead.serviceType = originalServiceType;
+        else {
+          lead[field.dataset.field] = selectedServiceType;
+          originalServiceType = selectedServiceType;
+        }
+      }
       else lead[field.dataset.field] = field.value || null;
     });
-    quote = CleaningQuoteEngine.calculateQuote(lead, { companyOverride });
+    quote = CleaningQuoteEngine.calculateQuote(lead, { companyOverride, discountPercent, discountTarget });
     await syncApprovedMessage({ invalidateAvailability: true });
     render();
   }
@@ -510,20 +538,23 @@
     if (action === 'copy-approved' && canCopyApprovedMessage()) {
       try {
         const slots = selectedAvailabilitySlots();
-        const reviewToCopy = slots === null
-          ? existingReview
-          : {
-            ...existingReview,
-            availability: slots,
-            availabilitySearch: { compatibleTotal: availability.compatibleTotal || 0 },
-            updatedAt: new Date().toISOString()
-          };
+        const reviewToCopy = {
+          ...existingReview,
+          id: existingReview?.id || lead.id,
+          lead: { ...lead },
+          quote,
+          state: existingReview?.state || 'pending_human_approval',
+          savedAt: existingReview?.savedAt || new Date().toISOString(),
+          availability: slots === null ? (existingReview?.availability || []) : slots,
+          availabilitySearch: slots === null
+            ? (existingReview?.availabilitySearch || null)
+            : { compatibleTotal: availability.compatibleTotal || 0 },
+          updatedAt: new Date().toISOString()
+        };
         await navigator.clipboard.writeText(CleaningQuoteMessages.approvedMessage(reviewToCopy));
-        if (slots !== null) {
-          await chrome.storage.local.set({ [reviewKey(lead.id)]: reviewToCopy });
-          existingReview = reviewToCopy;
-        }
-        confirmationFeedback = 'Approved message copied to clipboard.';
+        await chrome.storage.local.set({ [reviewKey(lead.id)]: reviewToCopy });
+        existingReview = reviewToCopy;
+        confirmationFeedback = 'Quote message copied to clipboard and saved to the queue.';
       } catch {
         confirmationFeedback = 'Could not copy the approved message.';
       }

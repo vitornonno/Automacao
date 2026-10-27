@@ -111,6 +111,8 @@ Todos os dados operacionais ficam no perfil local do Chrome, em `chrome.storage.
 ## Disponibilidade futura via Presto
 
 - O popup permite importar uma escala de disponibilidade de cleaners em `.xlsx` para qualquer empresa. A planilha deve ter um ou mais blocos com `Cleaner` na primeira coluna e cabeçalhos de data em `DD/MM`; o leitor aceita `Dia todo`, `A partir das 12:30 PM`, um horário isolado e intervalos explícitos. Os registros ficam apenas no armazenamento local do Chrome até serem substituídos ou limpos.
+- Ao abrir um card Presto, o leitor mantém a captura ativa até o mapa/coordenadas aparecerem ou o timeout expirar. Preço e cleaner podem renderizar antes do mapa e não devem encerrar a captura antecipadamente.
+- Para todas as empresas e fontes de agenda, a primeira janela de chegada possível é **8:30–9:00 AM**. Janelas calculadas ou importadas antes de 8:30 AM são normalizadas para 8:30 AM.
 - Para KACS, o cálculo combina essas janelas importadas com a agenda roteirizada do Rafael no Presto. Cada janela importada representa outra equipe e só é oferecida se comportar toda a duração estimada do serviço.
 - O leitor Presto aceita horários tanto em AM/PM quanto em 24 horas e reconhece os rótulos de preço `Preço:` e `Price:` usados pelas empresas.
 
