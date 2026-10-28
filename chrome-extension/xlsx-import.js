@@ -97,11 +97,11 @@
 
   function headerDates(row, year, previousMonth) {
     let lastMonth = previousMonth;
+    let resolvedYear = year;
     return row.map((value) => {
       const match = /(\d{1,2})\/(\d{1,2})/.exec(String(value || ''));
       if (!match) return null;
       const day = Number(match[1]); const month = Number(match[2]);
-      let resolvedYear = year;
       if (Number.isFinite(lastMonth) && month < lastMonth) resolvedYear += 1;
       lastMonth = month;
       return { date: `${resolvedYear}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`, month, year: resolvedYear };
@@ -115,12 +115,13 @@
     const rows = worksheetRows(sheet, sharedStrings(files.get('xl/sharedStrings.xml')));
     const windows = [];
     let priorMonth = null;
+    let currentYear = Number(year);
     for (let index = 0; index < rows.length; index += 1) {
       const header = rows[index];
       if (!/^cleaner$/i.test(String(header?.[0] || '').trim())) continue;
-      const dates = headerDates(header, Number(year), priorMonth);
-      const foundMonths = dates.filter(Boolean).map((item) => item.month);
-      if (foundMonths.length) priorMonth = foundMonths.at(-1);
+      const dates = headerDates(header, currentYear, priorMonth);
+      const foundDates = dates.filter(Boolean);
+      if (foundDates.length) { priorMonth = foundDates.at(-1).month; currentYear = foundDates.at(-1).year; }
       for (let rowIndex = index + 1; rowIndex < rows.length && !/^cleaner$/i.test(String(rows[rowIndex]?.[0] || '').trim()); rowIndex += 1) {
         const cleaner = String(rows[rowIndex]?.[0] || '').trim();
         if (!cleaner) continue;
@@ -134,7 +135,7 @@
     return { company, importedAt: new Date().toISOString(), year: Number(year), windows };
   }
 
-  const api = { parseCleanerAvailabilityWorkbook };
+  const api = { parseCleanerAvailabilityWorkbook, headerDates };
   root.CleaningXlsxImporter = api;
   if (typeof module !== 'undefined') module.exports = api;
 }(typeof globalThis !== 'undefined' ? globalThis : this));

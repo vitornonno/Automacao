@@ -7,6 +7,8 @@
 #cleaning-quote-assistant .lead-fields { display: grid; gap: 8px; }
 #cleaning-quote-assistant label { display: grid; gap: 3px; font-size: 12px; font-weight: 600; }
 #cleaning-quote-assistant input, #cleaning-quote-assistant select { box-sizing: border-box; width: 100%; padding: 7px; border: 1px solid #bdc8d7; border-radius: 5px; color: #172033; background: #fff; }
+#cleaning-quote-assistant .service-picker { width: 100%; height: 34px; border: 0; }
+#cleaning-quote-assistant .move-prompt { width: 100%; height: 78px; border: 0; }
 #cleaning-quote-assistant .result { border-top: 1px solid #e4e9f0; background: #f7f9fc; }
 #cleaning-quote-assistant .details-request { border-top: 1px solid #e4e9f0; background: #fffbeb; }
 #cleaning-quote-assistant .details-request strong { display: block; color: #7a4b00; font-size: 13px; }

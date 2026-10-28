@@ -170,7 +170,7 @@
     const candidates = BED_BATH_BANDS
       .filter((entry) => entry.bedrooms >= bedrooms && entry.bathrooms >= bathrooms)
       .sort((left, right) => left.band - right.band || left.bedrooms - right.bedrooms || left.bathrooms - right.bathrooms);
-    return candidates[0]?.band || Math.max(...SIZE_BANDS);
+    return candidates[0]?.band ?? null;
   }
 
   function chooseSizeBand(lead) {
@@ -184,9 +184,10 @@
     if (bedrooms && bathrooms) {
       const band = BED_BATH_TO_BAND[`${bedrooms}|${bathrooms}`];
       if (band) return { status: 'resolved', band, source: 'bedrooms_bathrooms', bedrooms, bathrooms };
+      const conservativeBand = conservativeBedBathBand(bedrooms, bathrooms);
       return {
-        status: 'resolved',
-        band: conservativeBedBathBand(bedrooms, bathrooms),
+        status: conservativeBand === null ? 'unmatched_size' : 'resolved',
+        band: conservativeBand,
         source: 'bedrooms_bathrooms_conservative',
         bedrooms,
         bathrooms
@@ -224,7 +225,7 @@
     const quotedRecurringFrequency = recurringFrequency && ['monthly', 'biweekly'].includes(recurringFrequency.id);
     // For a recurring Yelp request, "First Cleaning" means the introductory
     // discount belongs to the first regular visit after the initial cleaning.
-    const firstRecurringDiscountPercent = service === 'first_cleaning' && quotedRecurringFrequency && effectiveDiscountTarget === 'first_cleaning'
+    const firstRecurringDiscountPercent = service === 'first_cleaning' && recurringFrequency && effectiveDiscountTarget === 'first_cleaning'
       ? configuredDiscount
       : null;
     const base = {
@@ -241,6 +242,7 @@
     if (!service) return { ...base, status: 'missing_service', reason: 'No supported cleaning type was found.' };
     if (company === 'unknown') return { ...base, status: 'manual_company_required', reason: 'Select a supported company before calculating.' };
     if (size.status === 'missing_size') return { ...base, status: 'missing_size', reason: 'No usable square footage or bedroom/bathroom match was found.' };
+    if (size.status === 'unmatched_size') return { ...base, status: company === 'kacs' ? 'manual_hours_required' : 'manual_quote_required', reason: 'The bedroom and bathroom count exceeds the supported combinations; obtain square footage or prepare a manual estimate.' };
 
     if (company === 'kacs') {
       if (size.status === 'over_limit') {
@@ -250,7 +252,7 @@
       const baseHours = roundToNearestHalfHour(rawBaseHours);
       const recurringCleaning = quotedRecurringFrequency
         ? recurringCleaningQuote(recurringFrequency, size.band, effectiveDiscountTarget === 'regular' ? configuredDiscount : null, firstRecurringDiscountPercent)
-        : recurringFrequency;
+        : recurringFrequency ? { ...recurringFrequency, firstRecurringDiscount: firstRecurringDiscountPercent > 0 ? { percentage: firstRecurringDiscountPercent } : null } : null;
       return {
         ...base,
         quoteType: 'time_only',
@@ -267,21 +269,18 @@
     if (size.status === 'over_limit') return { ...base, status: 'manual_quote_required', reason: 'Homes above 3,000 sq. ft. require a human quote.' };
       const baseAmount = BEGINNER_PRICES[size.band][SERVICE_INDEX.indexOf(service)];
       const discountApplies = configuredDiscount !== null && configuredDiscount > 0 && effectiveDiscountTarget === service && !firstRecurringDiscountPercent;
-      const amount = discountApplies
-        ? roundUpToNearestFive(baseAmount * (1 - configuredDiscount / 100))
-        : baseAmount;
+      const standardPriceRange = { minimum: baseAmount, maximum: baseAmount + 100 };
+      const priceRange = discountApplies ? discountedRange(standardPriceRange, configuredDiscount) : standardPriceRange;
+      const amount = priceRange.minimum;
       const recurringCleaning = quotedRecurringFrequency
         ? recurringCleaningQuote(recurringFrequency, size.band, effectiveDiscountTarget === 'regular' ? configuredDiscount : null, firstRecurringDiscountPercent)
-        : recurringFrequency;
+        : recurringFrequency ? { ...recurringFrequency, firstRecurringDiscount: firstRecurringDiscountPercent > 0 ? { percentage: firstRecurringDiscountPercent } : null } : null;
       return {
       ...base,
       quoteType: 'fixed_price',
         amount,
       discount: discountApplies ? { percentage: configuredDiscount, amount: baseAmount - amount } : null,
-      priceRange: {
-          minimum: amount,
-          maximum: amount + 100
-      },
+      priceRange,
       currency: 'USD',
       recurringCleaning,
       status: 'ready_for_review'

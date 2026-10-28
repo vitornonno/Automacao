@@ -2,9 +2,9 @@
 (function contentModule() {
   'use strict';
 
+  const BUILD_VERSION = '0.1.25';
   let companyOverride = null;
   let discountPercent = '';
-  let discountTarget = '';
   let lead = null;
   let originalServiceType = null;
   let quote = null;
@@ -20,15 +20,27 @@
   let existingReview = null;
   let availability = null;
   let selectedAvailability = new Set();
+  let serviceChangeInFlight = false;
+  let lastManualServiceValue = '';
+  let manualServiceOverride = null;
+  let manualServiceOverrideLeadId = null;
+  let lastStoredManualOverride = null;
   let confirmationFeedback = '';
   let requestedDetails = new Set();
   let detailsRequestOpen = false;
+  let panelEdited = false;
+  const servicePickerNonce = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+
+  function manualServiceOverrideKey(leadId) {
+    return leadId ? `manualServiceOverride:${leadId}` : null;
+  }
 
   function logDebug(event, detail = {}) {
     debugEvents = [{ at: new Date().toLocaleTimeString(), event, detail }, ...debugEvents].slice(0, 60);
   }
   function captureSnapshot(currentLead, currentQuote) {
     return {
+      buildVersion: BUILD_VERSION,
       route: currentRoute(),
       activeRoute,
       queuedRoute,
@@ -52,18 +64,34 @@
         discount: currentQuote.discount || null,
         recurringCleaning: currentQuote.recurringCleaning || null
       } : null,
-      discountInput: { percentage: discountPercent || null, appliesTo: discountTarget || null },
+      discountInput: { percentage: discountPercent || null, appliesTo: currentQuote?.service || null },
+      manualCleaningTypeControl: {
+        displayedValue: root.querySelector?.('[data-field="serviceType"]')?.value || manualServiceOverride || null,
+        lastObservedValue: lastManualServiceValue || null,
+        recalculationInFlight: serviceChangeInFlight,
+        storedOverride: manualServiceOverride || null,
+        storageKey: manualServiceOverrideKey(currentLead?.id)
+      },
       existingReview: existingReview ? { state: existingReview.state, savedAt: existingReview.savedAt, updatedAt: existingReview.updatedAt } : null,
       events: debugEvents
     };
   }
   function debugMarkup() {
-    if (!debugMode) return '';
-    return `<details class="debug" open><summary>Verbose debug <button data-action="copy-debug" type="button">Copy debug</button></summary>${debugCopyFeedback ? `<small>${escapeHtml(debugCopyFeedback)}</small>` : ''}<pre>${escapeHtml(JSON.stringify(captureSnapshot(lead, quote), null, 2))}</pre></details>`;
+    // Native <details> does not depend on Yelp's event delegation, so debug
+    // remains inspectable even when a page swallows button click events.
+    return `<details class="debug"><summary>Verbose debug — click to expand</summary>${debugCopyFeedback ? `<small>${escapeHtml(debugCopyFeedback)}</small>` : ''}<pre>${escapeHtml(JSON.stringify(captureSnapshot(lead, quote), null, 2))}</pre></details>`;
   }
 
   const root = document.createElement('aside');
   root.id = 'cleaning-quote-assistant';
+  function mountRoot() {
+    // Keep the assistant inside the document body. Yelp installs global event
+    // handling around its application root; mounting beside it under <html>
+    // made native controls visually change without consistently delivering
+    // their events to this content script.
+    const container = document.body || document.documentElement;
+    if (root.parentElement !== container) container.append(root);
+  }
   let panelDrag = null;
   root.addEventListener('pointerdown', (event) => {
     if (!event.target.closest('header') || event.target.closest('button')) return;
@@ -74,6 +102,16 @@
     root.style.right = 'auto';
     event.preventDefault();
   });
+  // Use pointer capture for the header controls as well. It is more reliable
+  // than a bubbling click on Yelp's SPA, and fires before the page can stop a
+  // click event originating from our panel.
+  root.addEventListener('pointerdown', (event) => {
+    const action = event.target.closest?.('[data-action]')?.dataset.action;
+    if (action !== 'debug') return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    toggleDebug();
+  }, true);
   window.addEventListener('pointermove', (event) => {
     if (!panelDrag) return;
     const maxLeft = Math.max(0, window.innerWidth - root.offsetWidth);
@@ -85,6 +123,9 @@
 
   function currentRoute() { return `${location.origin}${location.pathname}${location.search}`; }
   function reviewKey(leadId) { return leadId ? `lead:${leadId}` : null; }
+  function validReview(review) {
+    return Boolean(review && typeof review.id === 'string' && review.lead && review.quote && ['approved', 'adjusted', 'pending_human_approval', 'discarded'].includes(review.state));
+  }
   function isYelpLeadPage() {
     return /(^|\.)yelp\.com(\.br)?$/i.test(location.hostname)
       && /^\/leads_center\/[^/]+\/leads\/[^/?#]+/.test(location.pathname);
@@ -97,10 +138,10 @@
       return;
     }
     if (!force && route === activeRoute && root.isConnected) return;
+    if (force && route === activeRoute && panelEdited && root.isConnected) return;
     activeRoute = route;
     companyOverride = null;
     discountPercent = '';
-    discountTarget = '';
     queueMode = false;
     queueFeedback = '';
     existingReview = null;
@@ -108,22 +149,45 @@
     selectedAvailability = new Set();
     confirmationFeedback = '';
     lead = CleaningLeadExtractor.extractLead();
+    if (manualServiceOverrideLeadId && manualServiceOverrideLeadId !== lead?.id) {
+      manualServiceOverride = null;
+      manualServiceOverrideLeadId = null;
+    }
     originalServiceType = lead?.serviceType || null;
+    if (manualServiceOverride && lead?.id === manualServiceOverrideLeadId) applyManualServiceType(manualServiceOverride);
     requestedDetails = new Set(['squareFeet', 'bedrooms', 'bathrooms'].filter((field) => !String(lead?.[field] || '').trim()));
     detailsRequestOpen = false;
-    quote = CleaningQuoteEngine.calculateQuote(lead, { discountPercent, discountTarget });
+    quote = CleaningQuoteEngine.calculateQuote(lead, { discountPercent });
     logDebug('Capture attempt', captureSnapshot(lead, quote).lead || {});
-    if (!root.isConnected) document.documentElement.append(root);
+    if (!root.isConnected) mountRoot();
     render();
     loadExistingReview(route, lead?.id);
+    restoreStoredManualServiceOverride(route, lead?.id);
     ensureCleaningType(route);
+  }
+
+  async function restoreStoredManualServiceOverride(route, leadId) {
+    const key = manualServiceOverrideKey(leadId);
+    if (!key) return;
+    try {
+      const stored = (await chrome.storage.local.get(key))[key];
+      if (currentRoute() !== route || lead?.id !== leadId || !stored?.serviceId || !CleaningQuoteEngine.INITIAL_LEAD_SERVICE_IDS.includes(stored.serviceId)) return;
+      const revision = `${stored.serviceId}:${stored.updatedAt || ''}`;
+      if (revision === lastStoredManualOverride) return;
+      lastStoredManualOverride = revision;
+      logDebug('Stored manual cleaning type restored', { selected: stored.serviceId });
+      await recalculate({ serviceId: stored.serviceId });
+    } catch {
+      // The native selector remains available if local storage cannot be read.
+    }
   }
   async function loadExistingReview(route, leadId) {
     const key = reviewKey(leadId);
     if (!key) return;
     const records = await chrome.storage.local.get(key);
     if (currentRoute() !== route || lead?.id !== leadId) return;
-    existingReview = records[key] || null;
+    existingReview = validReview(records[key]) ? records[key] : null;
+    if (records[key] && !existingReview) logDebug('Incomplete saved review ignored', {});
     if (existingReview) logDebug('Existing lead review found', { state: existingReview.state, savedAt: existingReview.savedAt });
     render();
   }
@@ -158,8 +222,13 @@
       root.remove();
       return;
     }
+    // Yelp may update only the URL fragment while interacting with a control.
+    // currentRoute intentionally excludes that fragment, so there is no new
+    // lead to capture in this case.
+    if (routeAtNavigation === activeRoute && root.isConnected) return;
     if (queuedRoute === routeAtNavigation) return;
     queuedRoute = routeAtNavigation;
+    panelEdited = false;
     activeRoute = routeAtNavigation;
     queueMode = false;
     quote = null;
@@ -167,7 +236,7 @@
     selectedAvailability = new Set();
     confirmationFeedback = '';
     detailsRequestOpen = false;
-    if (!root.isConnected) document.documentElement.append(root);
+    if (!root.isConnected) mountRoot();
     root.innerHTML = '<header><span>Lead estimate</span><button data-action="close" aria-label="Close">×</button></header><section class="result"><p><strong>Loading lead data…</strong><small>Waiting for Yelp to finish loading this lead.</small></p></section>';
     [3000, 4500, 6000].forEach((delay) => setTimeout(() => {
       if (currentRoute() === routeAtNavigation) refreshLeadPanel(true);
@@ -191,12 +260,16 @@
   function quoteDurationMinutes() { return quote?.estimatedHours ? Math.round(quote.estimatedHours.maximum * 60) : priceDurationMinutes(quote?.priceRange?.maximum || quote?.amount); }
   async function routeMinutes(origin, destination) { const response = await chrome.runtime.sendMessage({ type: 'ROUTE_RELAY_REQUEST', request: { origin, destination } }); if (!response?.ok) throw new Error(response?.error || 'Route lookup failed.'); return Math.ceil(response.route.durationSeconds / 60); }
   async function findAvailability() {
+    const requestedRoute = currentRoute();
+    const requestedLeadId = lead?.id;
+    const requestedQuote = quote;
     availability = { status: 'loading' }; render();
     try {
       const availabilityStorageKey = CleaningCleanerAvailability.storageKey(quote.company);
       const saved = await chrome.storage.local.get([`prestoJobs:${quote.company}`, availabilityStorageKey]);
       const snapshot = saved[`prestoJobs:${quote.company}`];
       if (!snapshot?.jobs?.length) throw new Error('Read this company’s Presto schedule first.');
+      if (!CleaningCleanerAvailability.isCurrentSnapshot(snapshot)) throw new Error('The Presto scan is outdated. Read the current schedule again.');
       if (!lead.location) throw new Error('Lead location is unavailable.');
       const geocode = await chrome.runtime.sendMessage({ type: 'GEOCODE_RELAY_REQUEST', query: lead.location });
       if (!geocode?.ok) throw new Error(geocode?.error || 'Could not locate the lead.');
@@ -213,18 +286,20 @@
       if (!scheduleCleaners.length) throw new Error('This Presto scan has no cleaner assignments. Reload the extension and read the schedule again.');
         const options = []; const unavailableDays = []; const availabilityDebug = [];
       for (const day of dateRange(snapshot.range.start, snapshot.range.end)) {
+          // Same-day openings need a live clock and additional lead time; do not offer past slots.
+          if (day <= CleaningCleanerAvailability.todayInCalifornia()) continue;
           if (isSunday(day)) {
             unavailableDays.push(day);
             availabilityDebug.push({ day, result: 'unavailable', reason: 'Sunday — service is not offered.' });
             continue;
           }
-          const importedSlots = CleaningCleanerAvailability.importedSlots(importedAvailability, day, duration);
-          options.push(...importedSlots);
           const dayJobs = grouped[day] || [];
+          const importedSlots = CleaningCleanerAvailability.safeImportedSlots(importedAvailability, day, duration, dayJobs);
+          options.push(...importedSlots);
           const scheduledJobs = primaryCleaner
-            ? dayJobs.filter((job) => Array.isArray(job.cleaners) && job.cleaners.includes(primaryCleaner))
+            ? dayJobs.filter((job) => !Array.isArray(job.cleaners) || !job.cleaners.length || job.cleaners.includes(primaryCleaner))
             : dayJobs;
-          if (scheduledJobs.some((job) => !job.coordinates || !Number.isFinite(job.price) || job.price <= 0 || !Array.isArray(job.cleaners) || !job.cleaners.length)) {
+          if (scheduledJobs.some((job) => !job.startTime || !job.coordinates || !Number.isFinite(job.price) || job.price <= 0 || !Array.isArray(job.cleaners) || !job.cleaners.length)) {
             if (!importedSlots.length) unavailableDays.push(day);
             availabilityDebug.push({ day, result: 'unavailable', reason: 'A Rafael job is missing a location, price, or cleaner assignment.' });
             continue;
@@ -274,13 +349,14 @@
         }
           const first = candidates.sort((a, b) => a.start - b.start)[0]; if (first === undefined) { if (!importedSlots.length) unavailableDays.push(day); } else options.push({ day, ...first });
       }
+        if (currentRoute() !== requestedRoute || lead?.id !== requestedLeadId || quote !== requestedQuote) return;
         options.sort((left, right) => left.day.localeCompare(right.day) || left.start - right.start || String(left.cleaner).localeCompare(String(right.cleaner)));
         const displayedOptions = options.slice(0, 3);
         const hiddenCompatibleOptions = options.slice(3);
         availability = { status: 'ready', approximateLocation: geocode.location.label, duration, options: displayedOptions, compatibleTotal: options.length, hiddenCompatibleOptions, unavailableDays, calculation: availabilityDebug };
         selectedAvailability = new Set(availability.options.map(availabilityKey));
         logDebug('Availability calculated', { company: snapshot.company?.name || quote.company, location: geocode.location.label, duration, options: availability.options, unavailableDays, calculation: availabilityDebug });
-    } catch (error) { availability = { status: 'error', error: error.message }; }
+    } catch (error) { if (currentRoute() !== requestedRoute || lead?.id !== requestedLeadId || quote !== requestedQuote) return; availability = { status: 'error', error: error.message }; }
     render();
   }
   function displayQuote(result) {
@@ -290,7 +366,9 @@
     if (result.status === 'ready_for_review') {
       const minimum = result.priceRange?.minimum ?? result.amount;
       const maximum = result.priceRange?.maximum ?? result.amount;
-      return `<strong>$${minimum}–$${maximum}</strong><small>Preliminary price range. Review required.</small>`;
+      const duration = quoteDurationMinutes();
+      const durationText = Number.isFinite(duration) && duration > 0 ? `${formatHours(duration / 60)} hours` : 'unavailable';
+      return `<strong>$${minimum}–$${maximum}</strong><small>Estimated cleaning time: ${durationText} (used for availability).</small><small>Preliminary price range. Review required.</small>`;
     }
     if (result.status === 'missing_size') return '<strong>Details needed</strong><small>Ask the client for the number of bedrooms and bathrooms before estimating.</small>';
     return `<strong>Manual review required</strong><small>${result.reason || 'Complete the missing lead details.'}</small>`;
@@ -372,7 +450,16 @@
     const availableServices = CleaningQuoteEngine.INITIAL_LEAD_SERVICE_IDS;
     const options = Object.entries(CleaningQuoteEngine.SERVICES).filter(([id]) => availableServices.includes(id))
       .map(([id, label]) => `<option value="${id}" ${id === current ? 'selected' : ''}>${label}</option>`).join('');
-    const moveTypeNote = normalized === 'move_in_out' ? '<small>Select Move-in or Move-out before the quote can be calculated.</small>' : '';
+    const moveTypeNote = normalized === 'move_in_out'
+      ? `<iframe class="move-prompt" title="Choose Move-in or Move-out" src="${chrome.runtime.getURL(`service-picker.html?mode=prompt&nonce=${encodeURIComponent(servicePickerNonce)}`)}"></iframe>`
+      : '';
+    // The Da Silva Yelp account consumes native form events fired inside the
+    // page. Its picker lives in an extension document, so Yelp cannot cancel
+    // its selection while the assistant keeps the same single-list workflow.
+    if (quote?.company === 'dasilva') {
+      const pickerUrl = chrome.runtime.getURL(`service-picker.html?nonce=${encodeURIComponent(servicePickerNonce)}&selected=${encodeURIComponent(current)}`);
+      return `<label>Cleaning type<iframe class="service-picker" title="Cleaning type" src="${pickerUrl}"></iframe>${moveTypeNote}</label>`;
+    }
     return `<label>Cleaning type<select data-field="serviceType"><option value="">Select cleaning type</option>${options}</select>${moveTypeNote}</label>`;
   }
   function conversationText() {
@@ -430,18 +517,20 @@
       ? `<button data-action="copy-details-request" ${requestedDetails.size ? '' : 'disabled'}>Copy selected details request</button>`
       : '<button data-action="open-details-request">Request details</button>';
     root.innerHTML = `
-        <header><span>Lead estimate</span><div><button data-action="debug" aria-label="Verbose debug">Debug</button><button data-action="close" aria-label="Close">×</button></div></header>
+        <header><span>Lead estimate <small>v${BUILD_VERSION}</small></span><div><small>Debug below</small><button data-action="close" aria-label="Close">×</button></div></header>
       <section class="lead-fields">
         ${input('Company name', lead.companyName, 'companyName')}
         <label>Company pricing<select data-field="companyOverride"><option value="">Auto-detect</option>${Object.entries(CleaningQuoteEngine.COMPANIES).map(([key, company]) => `<option value="${key}" ${companyOverride === key ? 'selected' : ''}>${escapeHtml(company.name)}</option>`).join('')}</select></label>
-        ${quote.company !== 'unknown' ? `<label>Discount applies to<select data-field="discountTarget"><option value="">No discount</option>${Object.entries(CleaningQuoteEngine.DISCOUNT_TARGETS).map(([key, label]) => `<option value="${key}" ${discountTarget === key ? 'selected' : ''}>${escapeHtml(label)}</option>`).join('')}</select></label><label>Discount %<input data-field="discountPercent" type="number" min="0" max="100" step="1" value="${escapeHtml(discountPercent)}" placeholder="Optional"></label>` : ''}
+        ${quote.company !== 'unknown' ? `<label>Discount %<input data-field="discountPercent" type="number" min="0" max="100" step="1" value="${escapeHtml(discountPercent)}" placeholder="Optional"></label>` : ''}
         ${serviceSelector(lead.serviceType)}
         ${input('Square feet', lead.squareFeet, 'squareFeet', 'number')}
         ${input('Bedrooms', lead.bedrooms, 'bedrooms', 'number')}
         ${input('Bathrooms', lead.bathrooms, 'bathrooms', 'number')}
       </section>
-      <section class="result"><p>${displayQuote(quote)}</p><dl><div><dt>Size band</dt><dd>${quote.size.band ? `up to ${quote.size.band} sq. ft.` : 'Not resolved'}</dd></div><div><dt>Source</dt><dd>${quote.size.source || 'Manual review'}</dd></div><div><dt>Status</dt><dd>${quote.status.replaceAll('_', ' ')}</dd></div></dl></section>
+      <section class="result"><p>${displayQuote(quote)}</p><dl><div><dt>Detected company</dt><dd>${escapeHtml(CleaningQuoteEngine.COMPANIES[quote.company]?.name || 'Not recognized')}</dd></div><div><dt>Size band</dt><dd>${quote.size.band ? `up to ${quote.size.band} sq. ft.` : 'Not resolved'}</dd></div><div><dt>Source</dt><dd>${quote.size.source || 'Manual review'}</dd></div><div><dt>Status</dt><dd>${quote.status.replaceAll('_', ' ')}</dd></div></dl></section>
         ${availabilityMarkup()}${detailsRequestMarkup()}${confirmationFeedback ? `<p class="existing-review">${escapeHtml(confirmationFeedback)}</p>` : ''}${reviewMessage}<footer><button data-action="copy-approved" ${canCopyApprovedMessage() ? '' : 'disabled'}>${copyLabel}</button>${quote.status === 'missing_size' ? '' : detailsAction}${followUpButtons()}<button data-action="availability" ${quote.status !== 'ready_for_review' ? 'disabled' : ''}>Find availability</button>${primaryAction}</footer>${debugMarkup()}`;
+    bindPanelControls();
+    lastManualServiceValue = root.querySelector('[data-field="serviceType"]')?.value || '';
   }
   async function renderQueue() {
     const records = await chrome.storage.local.get(null);
@@ -459,7 +548,7 @@
         ? `<div class="queue-actions"><button data-review-state="approved">Approve</button><button data-review-state="adjusted">Adjust</button><button class="quiet" data-review-state="discarded">Discard</button></div>` : '';
       return `<article class="queue-card" data-review-id="${escapeHtml(review.id)}"><div><strong>${escapeHtml(customerName)}</strong><span>${escapeHtml(review.state || 'pending_human_approval').replaceAll('_', ' ')}</span></div><p class="queue-company">${company}</p><p>${escapeHtml(itemQuote.serviceLabel || 'Service needs review')}</p><b>${result}</b>${actions}</article>`;
     }).join('') : '<p class="queue-empty">No saved leads yet.</p>';
-    root.innerHTML = `<header><span>Approval queue</span><div><button data-action="debug" aria-label="Verbose debug">Debug</button><button data-action="back" aria-label="Back">‹</button><button data-action="close" aria-label="Close">×</button></div></header><section class="queue-list">${queueFeedback ? `<p class="queue-feedback">${escapeHtml(queueFeedback)}</p>` : ''}${cards}</section>${debugMarkup()}`;
+    root.innerHTML = `<header><span>Approval queue</span><div><small>Debug below</small><button data-action="back" aria-label="Back">‹</button><button data-action="close" aria-label="Close">×</button></div></header><section class="queue-list">${queueFeedback ? `<p class="queue-feedback">${escapeHtml(queueFeedback)}</p>` : ''}${cards}</section>${debugMarkup()}`;
   }
   async function updateReviewState(id, state) {
     const key = `lead:${id}`;
@@ -468,11 +557,11 @@
     await chrome.storage.local.set({ [key]: { ...records[key], state, updatedAt: new Date().toISOString() } });
   }
   async function syncApprovedMessage({ invalidateAvailability = false } = {}) {
-    if (!canCopyApprovedMessage()) return false;
     if (invalidateAvailability) {
       availability = null;
       selectedAvailability = new Set();
     }
+    if (!canCopyApprovedMessage() || !validReview(existingReview) || !['approved', 'adjusted'].includes(existingReview.state)) return false;
     const slots = selectedAvailabilitySlots();
     const reviewToCopy = {
       ...existingReview,
@@ -497,32 +586,133 @@
       return false;
     }
   }
-  async function recalculate() {
+  function applyManualServiceType(serviceId) {
+    const selectedServiceType = CleaningQuoteEngine.SERVICES[serviceId] || null;
+    const isRecurringLead = Boolean(CleaningQuoteEngine.recurringCleaningFrequency(originalServiceType, lead.frequency));
+    // The selector displays First Cleaning for recurring leads, but the
+    // original Yelp wording carries the cadence needed for recurring rates.
+    if (serviceId === 'first_cleaning' && isRecurringLead) lead.serviceType = originalServiceType;
+    else {
+      lead.serviceType = selectedServiceType;
+    }
+    if (selectedServiceType) {
+      manualServiceOverride = serviceId;
+      manualServiceOverrideLeadId = lead?.id || null;
+    }
+  }
+  function bindManualServiceControl() {
+    const selector = root.querySelector('[data-field="serviceType"]');
+    if (!selector) return;
+    const applySelection = async (event) => {
+      event.stopPropagation();
+      if (serviceChangeInFlight) return;
+      serviceChangeInFlight = true;
+      try {
+        await recalculate({ serviceId: event.currentTarget.value });
+      } catch {
+        confirmationFeedback = 'Could not apply the selected cleaning type.';
+        render();
+      } finally {
+        serviceChangeInFlight = false;
+      }
+    };
+    // Chrome normally emits both events for a select; some Yelp page states
+    // only surface input. Handle either one, while applying it once.
+    selector.addEventListener('input', applySelection);
+    selector.addEventListener('change', applySelection);
+  }
+  function toggleDebug() {
+    debugMode = !debugMode;
+    logDebug('Debug mode toggled', { enabled: debugMode });
+    queueMode ? renderQueue() : render();
+  }
+  function bindPanelControls() {
+    bindManualServiceControl();
+  }
+  async function recalculate({ serviceId = null } = {}) {
+    panelEdited = true;
     root.querySelectorAll('[data-field]').forEach((field) => {
       if (field.dataset.field === 'companyOverride') companyOverride = field.value || null;
       else if (field.dataset.field === 'discountPercent') discountPercent = field.value.trim();
-      else if (field.dataset.field === 'discountTarget') discountTarget = field.value || '';
-      else if (field.dataset.field === 'serviceType') {
-        const selectedServiceType = CleaningQuoteEngine.SERVICES[field.value] || null;
-        const isRecurringLead = Boolean(CleaningQuoteEngine.recurringCleaningFrequency(originalServiceType, lead.frequency));
-        // The selector displays First Cleaning for recurring leads, but the
-        // original Yelp wording carries the cadence needed for recurring rates.
-        if (field.value === 'first_cleaning' && isRecurringLead) lead.serviceType = originalServiceType;
-        else {
-          lead[field.dataset.field] = selectedServiceType;
-          originalServiceType = selectedServiceType;
-        }
-      }
+      else if (field.dataset.field === 'serviceType') { if (!serviceId) applyManualServiceType(field.value); }
       else lead[field.dataset.field] = field.value || null;
     });
-    quote = CleaningQuoteEngine.calculateQuote(lead, { companyOverride, discountPercent, discountTarget });
+    if (serviceId) applyManualServiceType(serviceId);
+    quote = CleaningQuoteEngine.calculateQuote(lead, { companyOverride, discountPercent });
+    logDebug('Manual cleaning type applied', { selected: serviceId || root.querySelector('[data-field="serviceType"]')?.value || null, service: quote.service, status: quote.status });
     await syncApprovedMessage({ invalidateAvailability: true });
     render();
   }
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message?.type !== 'SET_ACTIVE_LEAD_SERVICE' && message?.type !== 'PICKER_SERVICE_APPLY') return undefined;
+    if (message.type === 'PICKER_SERVICE_APPLY' && message.nonce !== servicePickerNonce) {
+      sendResponse({ ok: false, error: 'Invalid selector session.' });
+      return undefined;
+    }
+    if (!CleaningQuoteEngine.INITIAL_LEAD_SERVICE_IDS.includes(message.serviceId) || !lead || !root.isConnected) {
+      sendResponse({ ok: false, error: 'The current lead is not ready for a manual service selection.' });
+      return undefined;
+    }
+    serviceChangeInFlight = true;
+    recalculate({ serviceId: message.serviceId })
+      .then(() => sendResponse({ ok: quote?.status === 'ready_for_review', status: quote?.status }))
+      .catch((error) => sendResponse({ ok: false, error: error.message || 'Could not apply the service type.' }))
+      .finally(() => { serviceChangeInFlight = false; });
+    return true;
+  });
+  // Yelp can swallow a select's change event, but it cannot prevent the
+  // browser from updating the selected value. Observe that native value and
+  // recalculate from it; this keeps the control in the panel rather than in
+  // a floating frame.
+  setInterval(() => {
+    if (!root.isConnected || serviceChangeInFlight) return;
+    const selector = root.querySelector('[data-field="serviceType"]');
+    const selected = selector?.value || '';
+    if (!selected || selected === lastManualServiceValue) return;
+    lastManualServiceValue = selected;
+    logDebug('Manual cleaning type observed', { selected });
+    serviceChangeInFlight = true;
+    void recalculate({ serviceId: selected })
+      .catch(() => {
+        confirmationFeedback = 'Could not apply the selected cleaning type.';
+        render();
+      })
+      .finally(() => { serviceChangeInFlight = false; });
+  }, 250);
+  setInterval(() => {
+    const leadId = lead?.id;
+    if (!root.isConnected || !leadId || serviceChangeInFlight) return;
+    const key = manualServiceOverrideKey(leadId);
+    chrome.storage.local.get(key).then((records) => {
+      const stored = records[key];
+      const revision = stored?.serviceId && stored?.updatedAt ? `${stored.serviceId}:${stored.updatedAt}` : null;
+      if (!revision || revision === lastStoredManualOverride || !CleaningQuoteEngine.INITIAL_LEAD_SERVICE_IDS.includes(stored.serviceId)) return;
+      lastStoredManualOverride = revision;
+      logDebug('Stored manual cleaning type observed', { selected: stored.serviceId });
+      serviceChangeInFlight = true;
+      void recalculate({ serviceId: stored.serviceId })
+        .catch(() => { confirmationFeedback = 'Could not apply the stored cleaning type.'; render(); })
+        .finally(() => { serviceChangeInFlight = false; });
+    }).catch(() => {});
+  }, 300);
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName !== 'local' || !lead?.id || !root.isConnected || serviceChangeInFlight) return;
+    const key = manualServiceOverrideKey(lead.id);
+    const stored = changes[key]?.newValue;
+    if (!stored?.serviceId || !CleaningQuoteEngine.INITIAL_LEAD_SERVICE_IDS.includes(stored.serviceId)) return;
+    const revision = `${stored.serviceId}:${stored.updatedAt || ''}`;
+    if (revision === lastStoredManualOverride) return;
+    lastStoredManualOverride = revision;
+    logDebug('Stored manual cleaning type changed', { selected: stored.serviceId });
+    serviceChangeInFlight = true;
+    void recalculate({ serviceId: stored.serviceId })
+      .catch(() => { confirmationFeedback = 'Could not apply the stored cleaning type.'; render(); })
+      .finally(() => { serviceChangeInFlight = false; });
+  });
   root.addEventListener('click', async (event) => {
-    const action = event.target.dataset.action;
+    const action = event.target.closest?.('[data-action]')?.dataset.action;
     if (action === 'close') root.remove();
-    if (action === 'debug') { debugMode = !debugMode; logDebug('Debug mode toggled', { enabled: debugMode }); queueMode ? renderQueue() : render(); }
+    if (action === 'debug') toggleDebug();
     if (action === 'copy-debug') {
       try {
         await navigator.clipboard.writeText(JSON.stringify(captureSnapshot(lead, quote), null, 2));
@@ -654,7 +844,7 @@
       }
       try {
         const records = await chrome.storage.local.get(key);
-        if (records[key] && records[key].state !== 'discarded' && !reviewHasWrongCompany(records[key]) && !reviewHasMoreCompleteDetails(records[key])) {
+        if (validReview(records[key]) && records[key].state !== 'discarded' && !reviewHasWrongCompany(records[key]) && !reviewHasMoreCompleteDetails(records[key])) {
           existingReview = records[key];
           event.target.textContent = 'Already confirmed';
           render();
@@ -677,6 +867,23 @@
       }
     }
   });
+  // Handle the manual cleaning selector during capture. This is intentionally
+  // separate from the generic change handler below: Yelp can consume bubbling
+  // events from controls it did not create, while a capture listener on our
+  // panel still receives the native select change.
+  root.addEventListener('change', (event) => {
+    const serviceSelector = event.target.closest?.('[data-field="serviceType"]');
+    if (!serviceSelector) return;
+    event.stopImmediatePropagation();
+    if (serviceChangeInFlight) return;
+    serviceChangeInFlight = true;
+    void recalculate({ serviceId: serviceSelector.value })
+      .catch(() => {
+        confirmationFeedback = 'Could not apply the selected cleaning type.';
+        render();
+      })
+      .finally(() => { serviceChangeInFlight = false; });
+  }, true);
   root.addEventListener('change', (event) => {
     const requestedDetail = event.target.closest('[data-request-detail]');
     if (requestedDetail) {

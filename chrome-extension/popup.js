@@ -10,6 +10,8 @@ const prestoStatusElement = document.querySelector('#presto-status');
 const prestoDebugOutput = document.querySelector('#presto-debug-output');
 let prestoDebug = null;
 let selectedFilter = 'all';
+const activeLeadServiceElement = document.querySelector('#active-lead-service');
+const activeLeadServiceStatusElement = document.querySelector('#active-lead-service-status');
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]);
@@ -128,6 +130,28 @@ reviewsElement.addEventListener('click', async (event) => {
   await loadReviews();
 });
 document.querySelector('#refresh').addEventListener('click', loadReviews);
+activeLeadServiceElement.addEventListener('change', async () => {
+  const serviceId = activeLeadServiceElement.value;
+  if (!serviceId) return;
+  activeLeadServiceElement.disabled = true;
+  activeLeadServiceStatusElement.textContent = 'Applying to the active Yelp lead…';
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id || !/^https:\/\/biz\.yelp\.com(?:\.br)?\/leads_center\//.test(tab.url || '')) throw new Error('Open the target Yelp lead tab first.');
+    const leadId = tab.url.match(/\/leads\/([^/?#]+)/)?.[1];
+    if (!leadId) throw new Error('Could not identify the current Yelp lead.');
+    await chrome.storage.local.set({ [`manualServiceOverride:yelp:${leadId}`]: { serviceId, updatedAt: Date.now() } });
+    // Message the current content script immediately. The saved value remains
+    // as a reliable fallback while Yelp is re-rendering the lead page.
+    const response = await chrome.tabs.sendMessage(tab.id, { type: 'SET_ACTIVE_LEAD_SERVICE', serviceId });
+    if (!response?.ok) throw new Error(response?.error || 'The lead could not accept the selected cleaning type.');
+    activeLeadServiceStatusElement.textContent = `${serviceId === 'move_in' ? 'Move-in' : 'Move-out'} applied to the active lead.`;
+  } catch (error) {
+    activeLeadServiceStatusElement.textContent = error.message || 'Could not apply the service type.';
+  } finally {
+    activeLeadServiceElement.disabled = false;
+  }
+});
 document.querySelectorAll('.filter').forEach((button) => button.addEventListener('click', () => {
   selectedFilter = button.dataset.filter;
   document.querySelectorAll('.filter').forEach((item) => item.classList.toggle('active', item === button));
@@ -259,7 +283,7 @@ const manualFields = {
   company: document.querySelector('#manual-company'), name: document.querySelector('#manual-name'),
   service: document.querySelector('#manual-service'), squareFeet: document.querySelector('#manual-square-feet'),
   bedrooms: document.querySelector('#manual-bedrooms'), bathrooms: document.querySelector('#manual-bathrooms'),
-  discount: document.querySelector('#manual-discount'), discountTarget: document.querySelector('#manual-discount-target'),
+  discount: document.querySelector('#manual-discount'),
   location: document.querySelector('#manual-location'), extraServices: document.querySelector('#manual-extra-services'),
   products: document.querySelector('#manual-products')
 };
@@ -283,7 +307,7 @@ function manualLead() {
     cleaningProducts: manualFields.products.value.trim() || null
   };
 }
-function manualQuote() { return CleaningQuoteEngine.calculateQuote(manualLead(), { companyOverride: manualFields.company.value, discountPercent: manualFields.discount.value.trim(), discountTarget: manualFields.discountTarget.value }); }
+function manualQuote() { return CleaningQuoteEngine.calculateQuote(manualLead(), { companyOverride: manualFields.company.value, discountPercent: manualFields.discount.value.trim() }); }
 function manualDuration(quote) {
   if (quote.estimatedHours) return Math.round(quote.estimatedHours.maximum * 60);
   const hours = Number(quote.priceRange?.maximum || quote.amount || 0) / 100;
@@ -298,7 +322,10 @@ function manualPriceDuration(price, company) {
 }
 function manualQuoteDescription(quote) {
   if (quote.status === 'ready_for_review' && quote.estimatedHours) return `${quote.estimatedHours.minimum}–${quote.estimatedHours.maximum} hours · KACS hourly estimate`;
-  if (quote.status === 'ready_for_review') return `$${quote.priceRange.minimum}–$${quote.priceRange.maximum} · preliminary estimate`;
+  if (quote.status === 'ready_for_review') {
+    const duration = manualDuration(quote);
+    return `$${quote.priceRange.minimum}–$${quote.priceRange.maximum} · preliminary estimate\nEstimated cleaning time: ${duration > 0 ? `${duration / 60} hours` : 'unavailable'} (used for availability)`;
+  }
   if (quote.status === 'missing_size') return 'Size details needed — a request-for-details message can still be copied.';
   return quote.reason || 'Complete the details needed for this quote.';
 }
@@ -356,11 +383,13 @@ async function manualRouteMinutes(origin, destination) {
 async function findManualAvailability() {
   const quote = manualQuote();
   const lead = manualLead();
+  const inputSnapshot = JSON.stringify(Object.fromEntries(Object.entries(manualFields).map(([key, field]) => [key, field.value])));
   if (quote.status !== 'ready_for_review') throw new Error('Complete a supported service and home size before finding availability.');
   if (!lead.location) throw new Error('Enter the service address or locality first.');
   const saved = await chrome.storage.local.get(`prestoJobs:${quote.company}`);
   const snapshot = saved[`prestoJobs:${quote.company}`];
   if (!snapshot?.jobs?.length) throw new Error('Read this company’s Presto schedule first.');
+  if (!CleaningCleanerAvailability.isCurrentSnapshot(snapshot)) throw new Error('The Presto scan is outdated. Read the current schedule again.');
   const geocode = await manualRelay({ type: 'GEOCODE_RELAY_REQUEST', query: lead.location, region: 'california' });
   if (!geocode?.ok) throw new Error(geocode?.error || 'Could not locate that address.');
   const destination = geocode.location;
@@ -384,11 +413,12 @@ async function findManualAvailability() {
     currentDay += 1;
     manualAvailabilityElement.innerHTML = `<p class="manual-location-confirmed">Location confirmed: ${escapeHtml(destination.label)}</p><p class="manual-availability-note">Calculating availability… ${currentDay} of ${totalDays} days checked.</p>`;
     const day = cursor.toISOString().slice(0, 10);
+    if (day <= CleaningCleanerAvailability.todayInCalifornia()) continue;
     if (new Date(`${day}T12:00:00`).getDay() === 0) continue;
-    options.push(...CleaningCleanerAvailability.importedSlots(importedAvailability, day, duration));
     const dayJobs = byDay[day] || [];
+    options.push(...CleaningCleanerAvailability.safeImportedSlots(importedAvailability, day, duration, dayJobs));
     const scheduledJobs = primaryCleaner
-      ? dayJobs.filter((job) => Array.isArray(job.cleaners) && job.cleaners.includes(primaryCleaner))
+      ? dayJobs.filter((job) => !Array.isArray(job.cleaners) || !job.cleaners.length || job.cleaners.includes(primaryCleaner))
       : dayJobs;
     if (scheduledJobs.some((job) => !job.coordinates || !Number.isFinite(job.price) || !job.startTime || !Array.isArray(job.cleaners) || !job.cleaners.length)) continue;
     const cleaner = primaryCleaner
@@ -414,6 +444,7 @@ async function findManualAvailability() {
     }
   }
   options.sort((left, right) => left.day.localeCompare(right.day) || left.start - right.start || String(left.cleaner).localeCompare(String(right.cleaner)));
+  if (inputSnapshot !== JSON.stringify(Object.fromEntries(Object.entries(manualFields).map(([key, field]) => [key, field.value])))) throw new Error('Quote details changed. Search availability again.');
   manualAvailability = { options, duration, compatibleTotal: options.length, approximateLocation: destination.label };
   selectedManualAvailability = new Set(options.slice(0, 3).map(manualKey));
 }

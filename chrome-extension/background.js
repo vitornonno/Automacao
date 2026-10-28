@@ -1,4 +1,13 @@
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === 'PICKER_SERVICE_SELECTED') {
+    if (sender.id !== chrome.runtime.id || !sender.tab?.id || !sender.url?.startsWith(chrome.runtime.getURL('service-picker.html'))) {
+      sendResponse({ ok: false });
+      return undefined;
+    }
+    chrome.tabs.sendMessage(sender.tab.id, { type: 'PICKER_SERVICE_APPLY', nonce: message.nonce, serviceId: message.serviceId }, { frameId: 0 })
+      .then(sendResponse).catch((error) => sendResponse({ ok: false, error: error.message }));
+    return true;
+  }
   if (message.type === 'TEST_ROUTE_RELAY') {
     chrome.storage.local.get('routeRelay').then(async ({ routeRelay }) => {
       const baseUrl = String(routeRelay?.url || '').replace(/\/+$/, '');

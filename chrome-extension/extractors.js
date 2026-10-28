@@ -69,6 +69,26 @@
   function firstName(value) {
     return String(value || '').trim().split(/\s+/)[0] || null;
   }
+  function isCustomerName(value) {
+    const normalized = String(value || '').replace(/\s+/g, ' ').trim();
+    if (!/^[A-Z][A-Za-zÀ-ÿ'’-]{1,}(?:\s+(?:[A-Z][A-Za-zÀ-ÿ'’-]{1,}|[A-Z]\.)){0,2}$/.test(normalized)) return false;
+    return !/^(contacted lead details|my leads|nearby jobs|deep cleaning|regular home cleaning|first cleaning|move-in cleaning|move-out cleaning|post-construction cleaning)$/i.test(normalized);
+  }
+  function visibleCustomerName() {
+    // A generic bold heading can belong to a different lead or a page section.
+    // Accept only a visible customer region whose profile link confirms its label.
+    const candidates = Array.from(document.querySelectorAll('main [role="region"][aria-label]'))
+      .filter((region) => {
+        const rect = region.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      })
+      .map((region) => {
+        const label = String(region.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim();
+        const links = Array.from(region.querySelectorAll('a[href*="/user_details?"]'));
+        return isCustomerName(label) && links.some((link) => String(link.innerText || '').replace(/\s+/g, ' ').trim() === label) ? label : null;
+      }).filter(Boolean);
+    return candidates.length === 1 ? firstName(candidates[0]) : null;
+  }
   function leadLocation(value) {
     const source = String(value || '');
     return source.match(/\b([A-Za-z][A-Za-z .'-]+,\s*CA\s*\d{5})\b/)?.[1]
@@ -80,9 +100,25 @@
     if (/jhey['’]s\s+cleaning(?:\s+services)?/i.test(source)) return 'Jhey’s Cleaning Services';
     if (/\bkacs\s+cleaning(?:\s+services)?/i.test(source)) return 'KACS Cleaning Services';
     if (/\bda\s*silva\s+cleaning(?:\s+services)?\b/i.test(source)) return 'Da Silva Cleaning Services';
+    if (/\bu\.?\s*t\.?\s*cleans?\b/i.test(source)) return 'UT Cleans';
+    if (/\bmary['’]?s\s+house\s+cleaning\b/i.test(source)) return "Mary's House Cleaning";
     if (/\bgleam\s+team(?:\s+housecleaning)?\b/i.test(source)) return 'Gleam Team Housecleaning';
     if (/express\s+house\s+cleaning/i.test(source)) return 'Express House Cleaning';
     return null;
+  }
+  function yelpBusinessNameFromSidebar() {
+    // The business label lives in Yelp's left navigation. Unlike the lead
+    // conversation, it represents the active account and does not change
+    // when old messages mention another company.
+    const candidates = Array.from(document.querySelectorAll('nav *, [role="navigation"] *'))
+      .filter((element) => element.id !== 'cleaning-quote-assistant' && !element.closest('#cleaning-quote-assistant'))
+      .map((element) => ({ element, value: String(element.innerText || '').trim() }))
+      .filter(({ value }) => value && value.length <= 90 && yelpBusinessNameFromText(value))
+      .map((candidate) => ({ ...candidate, rect: candidate.element.getBoundingClientRect() }))
+      .filter(({ rect }) => rect.width > 0 && rect.height > 0 && rect.left < window.innerWidth * 0.45 && rect.top < window.innerHeight * 0.65)
+      .sort((a, b) => a.rect.top - b.rect.top || a.rect.left - b.rect.left || a.value.length - b.value.length);
+    const names = [...new Set(candidates.map(({ value }) => yelpBusinessNameFromText(value)))];
+    return names.length === 1 ? names[0] : null;
   }
 
   function extractYelpLeadFromState(state, pathname) {
@@ -91,7 +127,12 @@
     const lead = Object.values(state).find((record) => record?.__typename === 'Lead' && record.encid === leadId);
     const project = lead?.project?.__ref ? state[lead.project.__ref] : null;
     if (!project) return null;
-    const business = Object.values(state).find((record) => record?.__typename === 'Business' && record.name);
+    // The Apollo cache can contain several businesses. Read the one linked to
+    // this lead instead of accepting whichever Business record appears first.
+    const businessId = pathname.match(/^\/leads_center\/([^/]+)/)?.[1];
+    const linkedBusiness = lead?.business?.__ref ? state[lead.business.__ref] : null;
+    const business = (businessId && state[`Business:${businessId}`])
+      || (linkedBusiness?.__typename === 'Business' && linkedBusiness.encid === businessId ? linkedBusiness : null);
     const description = project.description || '';
     const bedroomAnswer = surveyAnswer(project, /how many bedrooms/i);
     const bathroomAnswer = surveyAnswer(project, /how many bathrooms/i);
@@ -102,7 +143,7 @@
       id: `yelp:${leadId}`,
       platform: 'yelp',
       url: global.location?.href || null,
-      companyName: business?.name || null,
+      companyName: yelpBusinessNameFromText(business?.name) || business?.name || null,
       customerName: firstName(customer?.displayName),
       phoneNumber: lead.phoneNumberConnectionInfo?.consumerPhoneNumber || null,
       squareFeet: squareFeetFromText(description),
@@ -125,6 +166,7 @@
     if (!apolloLead) return visibleLead;
     if (!visibleLead) return apolloLead;
     const currentAnswers = {
+      customerName: apolloLead.customerName || visibleLead.customerName,
       bedrooms: visibleLead.bedrooms || apolloLead.bedrooms,
       bathrooms: visibleLead.bathrooms || apolloLead.bathrooms,
       frequency: visibleLead.frequency || apolloLead.frequency,
@@ -160,14 +202,19 @@
     const bathroomAnswer = answerAfterLastLabel(content, 'How many bathrooms are in your home?');
     const bedrooms = numberFromDescription(bedroomAnswer || content, 'bedrooms');
     const bathrooms = numberFromDescription(bathroomAnswer || content, 'bathrooms');
-    const names = Array.from(document.querySelectorAll('[data-font-weight="bold"]')).map((element) => element.innerText.trim());
-    const customerName = names.find((name) => /^[A-Z][A-Za-z'-]+\s+[A-Z]\.$/.test(name)) || null;
+    const customerName = visibleCustomerName();
     const businessId = location.pathname.match(/^\/leads_center\/([^/]+)/)?.[1] || null;
     const knownBusinessNames = {
       BnI3aSQTdRlX1YGUuPfAiA: 'Jhey’s Cleaning Services',
-      FAHbiW72jLTiNDvcOptrfg: 'KACS Cleaning Services'
+      FAHbiW72jLTiNDvcOptrfg: 'KACS Cleaning Services',
+      NKYK8RrTUSDhdbaI848bjg: 'Da Silva Cleaning Services'
     };
-    const companyName = yelpBusinessNameFromText(content) || knownBusinessNames[businessId] || null;
+    // Route account ID is authoritative. Do not search the conversation
+    // before it: follow-ups often name another company and caused KACS pages
+    // to be misidentified as Jhey's.
+    const companyName = knownBusinessNames[businessId]
+      || yelpBusinessNameFromSidebar()
+      || null;
     if (!serviceType && !bedrooms && !bathrooms) return null;
     return {
       id: `yelp:${location.pathname.match(/\/leads\/([^/?#]+)/)?.[1] || location.pathname}`,
@@ -192,6 +239,12 @@
   function extractLead() {
     const yelpLead = platform() === 'yelp' ? extractYelpLead() : null;
     if (yelpLead) return yelpLead;
+    // Never infer a Yelp business from arbitrary conversation text.
+    if (platform() === 'yelp') return {
+      id: `yelp:${location.pathname.match(/\/leads\/([^/?#]+)/)?.[1] || location.pathname}`,
+      platform: 'yelp', url: location.href, companyName: null, customerName: null,
+      extractedAt: new Date().toISOString(), captureSource: 'yelp_unresolved'
+    };
     const bodyText = text();
     const companyName = firstMatch([/(?:company|business)\s*(?:name)?\s*[:\-]\s*([^\n]+)/i], bodyText);
     const squareFeet = squareFeetFromText(bodyText);
@@ -214,6 +267,6 @@
     };
   }
 
-  global.CleaningLeadExtractor = { extractLead, yelpApolloStateFromScripts, extractYelpLeadFromState, firstName, yelpBusinessNameFromText, surveyAnswer, squareFeetFromText };
+  global.CleaningLeadExtractor = { extractLead, yelpApolloStateFromScripts, extractYelpLeadFromState, firstName, isCustomerName, yelpBusinessNameFromText, surveyAnswer, squareFeetFromText };
   if (typeof module !== 'undefined') module.exports = global.CleaningLeadExtractor;
 })(globalThis);

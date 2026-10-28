@@ -1,0 +1,11 @@
+{
+  "name": "cleaning-lead-extension-tests",
+  "private": true,
+  "scripts": {
+    "test": "node test-pricing.js && node test-cleaner-availability.js",
+    "test:browser": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0"
+  }
+}

@@ -19,7 +19,6 @@
           <label>Square feet<input id="manual-square-feet" type="number" min="1" placeholder="Optional"></label>
           <label>Bedrooms<input id="manual-bedrooms" type="number" min="0" step="1" placeholder="Optional"></label>
           <label>Bathrooms<input id="manual-bathrooms" type="number" min="0" step="0.5" placeholder="Optional"></label>
-          <label>Discount applies to<select id="manual-discount-target"><option value="">No discount</option><option value="regular">Regular Cleaning</option><option value="first_cleaning">First Cleaning</option><option value="deep_cleaning">Deep Cleaning</option><option value="move_in">Move-In Cleaning</option><option value="move_out">Move-Out Cleaning</option><option value="post_construction">Post-Construction Cleaning</option></select></label>
           <label>Discount %<input id="manual-discount" type="number" min="0" max="100" step="1" placeholder="Optional"></label>
           <label class="manual-full">Service address or locality<input id="manual-location" type="text" placeholder="Street address, city, or ZIP code"></label>
           <label class="manual-full">Additional services requested<input id="manual-extra-services" type="text" placeholder="Optional"></label>
@@ -28,6 +27,12 @@
         <p id="manual-quote-summary" class="manual-summary" aria-live="polite"></p>
         <div class="manual-actions"><button id="manual-find-availability" type="button">Find availability</button><button id="manual-copy-message" class="quiet" type="button">Copy quote message</button></div>
         <section id="manual-availability" aria-live="polite"></section>
+      </section>
+      <section class="active-lead-service">
+        <strong>Active Yelp lead</strong>
+        <small>For a Move-in / Move-out lead, choose the type to apply to the current Yelp tab.</small>
+        <select id="active-lead-service"><option value="">Move-in / Move-out type</option><option value="move_in">Move-in Cleaning</option><option value="move_out">Move-out Cleaning</option></select>
+        <small id="active-lead-service-status" aria-live="polite"></small>
       </section>
       <nav aria-label="Review filters">
         <button class="filter" data-filter="pending_human_approval">Pending</button>

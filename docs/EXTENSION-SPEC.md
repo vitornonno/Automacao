@@ -16,15 +16,18 @@ Extensão Chrome local para apoiar o atendimento de novas leads de empresas de l
 | KACS Cleaning Services LLC | Estimativa de horas; não informar valor total ao cliente | `docs/guia_precificacao_horas.xlsx`, aba `KACS` |
 | Jhey's Cleaning | Faixa de preço: tabela base até US$100 acima | `docs/guia_precificacao.xlsx`, aba `Empresa iniciante` |
 | Da Silva Cleaning Services | Mesma faixa e tabela da Jhey's; mensagens e telefone próprios | `docs/DaSilva Cleaning.txt` |
-| Gleam Team Housecleaning | Mesma faixa e tabela da Jhey's; 15% de desconto em First, Deep e Move-In | `docs/Gleam Team Housecleaning.txt` |
+| UT Cleans | Mesma tabela base da Jhey's; mensagens e telefone próprios | `docs/Cópia de UT Cleans - Follow Up.docx` |
+| Mary's House Cleaning | Mesma tabela base da Jhey's; mensagens e telefone próprios | `docs/MARY'S HOUSE CLEANING.docx` |
+| Gleam Team Housecleaning | Mesma tabela base da Jhey's; mensagens e telefone próprios | `docs/Gleam Team Housecleaning.txt` |
 | Express House Cleaning | Mesma faixa e tabela da Jhey's; mensagens e telefone próprios | `docs/Express House Cleaning.txt` |
 
 Os nomes `Jhey's` e `Jhey’s` são equivalentes. A identificação no fallback visual do Yelp lê o nome mostrado na página e também reconhece as contas atualmente conhecidas:
 
 - KACS: `FAHbiW72jLTiNDvcOptrfg`
 - Jhey’s: `BnI3aSQTdRlX1YGUuPfAiA`
+- Da Silva: `NKYK8RrTUSDhdbaI848bjg`
 
-Empresa ausente ou desconhecida exige escolha humana no campo **Company pricing**. A extensão não deve escolher uma tabela de preço por inferência. Para a Gleam, quando o Yelp informar o pedido combinado `Move-in / Move-out Cleaning`, o atendente deve escolher manualmente **Move-In** ou **Move-Out** antes de confirmar: o desconto de 15% vale somente para Move-In.
+Empresa ausente ou desconhecida exige escolha humana no campo **Company pricing**. A extensão não infere a empresa pelo texto da conversa. O nome do cliente vem preferencialmente da lead ativa no estado Apollo; o fallback visual exige uma região de cliente identificável. Se não houver evidência confiável, o nome fica vazio.
 
 ## Dados necessários
 
@@ -45,9 +48,9 @@ Quando os valores do estado Apollo divergirem das respostas atuais visíveis no 
 ## Regras de serviço e faixa de tamanho
 
 - Uma nova lead marcada como `Regular home cleaning` sempre vira **First Cleaning**, mesmo se pedir atendimento semanal, quinzenal ou mensal. Tarifas recorrentes são apenas para clientes já atendidos após First/Deep Cleaning.
-- Leads Move-In e Move-Out usam uma única cotação preliminar: a média das duas colunas correspondentes da tabela. A mensagem pergunta se o serviço é Move-In ou Move-Out para fechar uma estimativa mais precisa e justa.
+- Quando o Yelp informa Move-in/Move-out combinado, o painel pergunta qual é o serviço. A escolha usa a coluna correspondente de Move-in ou Move-out; os valores não são calculados pela média.
 - A metragem usa a próxima faixa superior da tabela.
-- Sem metragem, quartos/banheiros definem uma faixa. Quando não houver linha exata, usar a menor combinação cadastrada que tenha pelo menos a mesma quantidade de quartos e banheiros; isto produz a faixa viável mais próxima de forma conservadora (por exemplo, 3 quartos / 1 banheiro usa a linha 3 quartos / 2 banheiros, de 1.600 sq. ft.). Se nenhuma linha cobrir ambos os números, usar a maior faixa disponível. A combinação 4 quartos / 4 banheiros usa a faixa conservadora de 3.000 sq. ft.
+- Sem metragem, quartos/banheiros definem uma faixa. Se não houver linha exata, usa-se a menor combinação cadastrada que cubra ambos; se nenhuma cobrir, exige-se revisão manual. A combinação 4 quartos / 4 banheiros usa 3.000 sq. ft.
 - Acima de 3.000 sq. ft. há revisão manual.
 - Sem metragem e sem combinação válida de quartos/banheiros, a extensão prepara um pedido de dados, em vez de gerar cotação.
 
@@ -64,10 +67,17 @@ Quando os valores do estado Apollo divergirem das respostas atuais visíveis no 
 
 - A faixa sempre é `valor da tabela` até `valor da tabela + US$100`.
 - A mensagem informa serviço recomendado, faixa, equipe de 2 profissionais e os dados disponíveis da residência.
-- Informar que a equipe fará uma rápida walkthrough na chegada para confirmar o escopo e o valor final antes de começar.
+- Não incluir a promessa de avaliar a casa e definir o escopo na chegada.
 - Para dados de tamanho faltantes, solicitar metragem, quartos/banheiros e, opcionalmente, fotos ou vídeo.
 - As mensagens seguem `docs/Base VA - Jhey's Cleaning.txt`. Não inventar duração estimada: a tabela disponível contém preços, não tempos.
 - As mensagens de primeira resposta da Jhey’s usam tom acolhedor e promocional para novos clientes, destacando cuidado personalizado e valor do serviço. A faixa exibida já incorpora o preço introdutório para novos clientes; não informar percentual ou preço anterior que não esteja definido. Não devem inventar vagas, duração ou promessas de resultado.
+
+## Desconto, recorrência e duração no painel
+
+- O campo opcional **Discount %** aceita de 0 a 100 e aplica o percentual ao tipo selecionado em **Cleaning type**; vazio não menciona desconto. Nas cotações de preço fixo, ambos os limites da faixa são descontados e arredondados para cima em incrementos de US$5.
+- Para um pedido recorrente de First Cleaning, o desconto informado vale para a primeira limpeza regular após a inicial; a mensagem informa o preço normal das visitas seguintes. Frequências quinzenal e mensal usam o preço da tabela mais uma faixa de US$30. Para semanal, o preço é confirmado após a primeira limpeza, sem inventar valor.
+- KACS usa cobrança por hora e não aplica desconto ao serviço inicial; o campo permanece disponível.
+- O painel e o formulário manual mostram abaixo do preço a estimativa de tempo usada na busca de disponibilidade. Nas empresas de preço fixo, essa duração é uma estimativa operacional derivada do teto da cotação, não uma duração confirmada pela equipe.
 
 ## Limitações de serviço nas mensagens de cotação
 
@@ -102,7 +112,7 @@ Ao reabrir uma lead salva/aprovada/ajustada, não criar uma duplicata. O botão 
 Todos os dados operacionais ficam no perfil local do Chrome, em `chrome.storage.local`:
 
 - Cada cotação confirmada é armazenada pela chave única `lead:<id-da-lead-do-yelp>`.
-- No popup da extensão, **Clear queue** remove, após confirmação, todos os registros locais `lead:*`. Não remove snapshots de agenda do Presto, token do relay ou qualquer dado externo.
+- No popup da extensão, **Remove** permite remover individualmente uma lead da fila local, após confirmação. Não remove dados externos.
 - A agenda lida do Presto é armazenada por empresa em `prestoJobs:kacs` e `prestoJobs:jheys`.
 - Uma nova leitura do Presto substitui o snapshot anterior daquela empresa.
 - Esses dados não são gravados em arquivos do projeto, no Presto, no CRM ou no Cloudflare.
@@ -114,6 +124,8 @@ Todos os dados operacionais ficam no perfil local do Chrome, em `chrome.storage.
 - Ao abrir um card Presto, o leitor mantém a captura ativa até o mapa/coordenadas aparecerem ou o timeout expirar. Preço e cleaner podem renderizar antes do mapa e não devem encerrar a captura antecipadamente.
 - Para todas as empresas e fontes de agenda, a primeira janela de chegada possível é **8:30–9:00 AM**. Janelas calculadas ou importadas antes de 8:30 AM são normalizadas para 8:30 AM.
 - Para KACS, o cálculo combina essas janelas importadas com a agenda roteirizada do Rafael no Presto. Cada janela importada representa outra equipe e só é oferecida se comportar toda a duração estimada do serviço.
+- Uma janela importada é descartada se o mesmo cleaner tiver qualquer job naquele dia; jobs sem cleaner identificado bloqueiam a avaliação do dia. Isso é conservador porque a planilha não informa a rota da equipe.
+- A leitura do Presto deve ser feita no mês atual e o snapshot deve ser do dia atual na Califórnia. A navegação para o próximo mês precisa ser confirmada; em caso de falha, a leitura não é salva. Por segurança, a busca não oferece horários no próprio dia.
 - O leitor Presto aceita horários tanto em AM/PM quanto em 24 horas e reconhece os rótulos de preço `Preço:` e `Price:` usados pelas empresas.
 
 O Presto será a fonte de verdade para agenda. KACS e Jhey's usam agendas independentes; uma disponibilidade nunca pode considerar jobs, equipes ou horários da outra empresa. Os cartões de job abertos expõem início, endereço, coordenadas do Google Maps, cleaner/equipe, tipo de serviço e preço.
@@ -123,13 +135,13 @@ O Presto será a fonte de verdade para agenda. KACS e Jhey's usam agendas indepe
 - Domingos nunca são oferecidos, mesmo quando a agenda estiver vazia.
 - Para KACS e Jhey's, usar a duração prevista quando ela estiver disponível. Para KACS, isso normalmente é o limite superior da estimativa de horas da cotação.
 - Quando não houver estimativa/duração disponível, a duração operacional é derivada do valor do serviço a US$100/h, arredondando para cima para o próximo intervalo de 30 minutos.
-- A disponibilidade só é válida se couber entre os jobs existentes da agenda da empresa, considerando duração do novo serviço, trânsito e margem operacional fixa de 30 minutos. Não há separação por equipe neste cálculo.
+- A disponibilidade só é válida se couber entre os jobs relevantes, considerando duração do novo serviço, trânsito e margem operacional fixa de 30 minutos. Para a rota principal, KACS usa Rafael e Jhey’s usa Jheyce; janelas importadas são avaliadas por cleaner.
 - Uma disponibilidade só pode ser oferecida se o fim estimado da nova limpeza for até **7:00 PM**. Se a duração estimada, somada ao horário de início sugerido, ultrapassar esse limite, o dia não pode ser sugerido.
 - O cálculo deve avaliar cada gap entre jobs em ordem cronológica. Para encaixar uma limpeza, o intervalo deve comportar: **duração estimada da nova limpeza + 30 minutos de tolerância operacional + tempo de deslocamento entre uma limpeza e outra**. Em encaixes entre dois jobs, considerar o deslocamento do job anterior até a nova limpeza e da nova limpeza até o próximo job. Após o último job, usar seu término estimado como o início possível da nova limpeza; o término da nova limpeza deve continuar até 7:00 PM.
   - O término de cada limpeza é sempre estimado pelo seu valor operacional (preço ÷ US$100/h quando não houver duração explícita). Antes de aceitar um encaixe que tenha próximo job, a extensão soma o término da nova limpeza, a tolerância e o trajeto até o ZIP/localização do próximo job; se a chegada for posterior ao início desse job, o horário é rejeitado. Para uma faixa de preço, usa-se o teto como medida conservadora.
   - Ao calcular disponibilidade, cada horário sugerido deve mostrar o último job usado no cálculo, seu início, duração e término estimados, além dos minutos de trajeto até a lead (e, quando existir, da lead até o próximo job). Dias sem jobs devem declarar que não existe trajeto entre jobs a calcular.
 - Endereços já agendados podem usar as coordenadas expostas pelo Presto. Leads do Yelp sem endereço completo devem ser tratadas apenas como estimativa por região até que o cliente informe o endereço.
-- A versão com trânsito real usa o perfil `driving-traffic` do Mapbox Directions. O token deve ficar somente em um serviço intermediário (backend/Worker), nunca no código ou armazenamento da extensão. Sem o serviço de rotas, a extensão deve usar uma margem de deslocamento conservadora e sinalizar que é uma estimativa.
+- A versão com trânsito real usa o perfil `driving-traffic` do Mapbox Directions. O token do Mapbox fica somente no serviço intermediário. Sem o relay configurado ou funcional, a busca de rota falha e deve ser refeita; não se presume uma rota válida.
 - A base do relay está em `route-relay/`. Ele aceita somente `POST /routes`, autentica a extensão por token separado e devolve duração/distância; não cria nem altera jobs do Presto.
 - O popup da extensão tem a seção **Route relay**. Ela armazena localmente a URL do Worker e o `EXTENSION_TOKEN`, faz uma consulta de rota de teste e deixa pronto o canal para consultas `POST /routes`. Para transferir a configuração entre perfis do Chrome, o token salvo pode ser copiado localmente pelo botão **Copy token** ou revelado temporariamente por **Show token**. A URL atual é `https://cleaning-route-relay.jvnonno54.workers.dev`.
 - A integração Presto é somente leitura: com a agenda correta aberta, **Presto schedule → Read visible schedule** identifica automaticamente KACS ou Jhey's pelo nome exibido no menu da conta, abre os cards dos eventos visíveis e captura horário, endereço/coordenadas e preço. A agenda usa horários AM/PM, convertidos para 24 horas antes do cálculo. O leitor aguarda o card de serviço aberto e lê o valor no campo localizado `Preço`, sem depender de o mapa estar presente. O snapshot é gravado pela própria página do Presto, portanto permanece disponível mesmo se o popup da extensão for fechado durante ou após a leitura; ao reabrir o popup, ele restaura o último scan salvo. Não cria, edita ou reserva jobs no Presto.
@@ -143,7 +155,7 @@ O Presto será a fonte de verdade para agenda. KACS e Jhey's usam agendas indepe
 
 ## Debug e manutenção
 
-O botão **Debug** mostra rota, origem da captura, campos extraídos, resultado da cotação, registro existente e eventos recentes. O botão **Copy debug** copia esse JSON para a área de transferência para diagnóstico.
+No painel da lead, **Verbose debug** expande o JSON com versão, rota, origem da captura, campos extraídos, cotação, registro existente e eventos recentes. Evite compartilhar dados pessoais além do necessário para diagnóstico.
 
 Arquivos principais:
 
@@ -166,7 +178,10 @@ Arquivos principais:
 
 ```powershell
 node test-pricing.js
+node test-cleaner-availability.js
 node --check content.js
 node --check extractors.js
 node --check quote-messages.js
 ```
+
+Os testes cobrem as sete empresas com dados Apollo simulados, incluindo nomes de leads diferentes e ausência de nome. Os HTMLs reais disponíveis validaram KACS/Jacob e Da Silva/Alejandra; as demais contas ainda precisam de validação com suas próprias páginas. O Playwright está instalado para testes locais, mas o teste com HTML salvo da Da Silva apresentou falha e não comprova o funcionamento no Yelp real; a tentativa de acesso ao vivo recebeu HTTP 429. O fluxo acordado é testar no Chrome do atendente e compartilhar debug ou HTML quando necessário.

@@ -4,6 +4,7 @@ memory/
 MEMORY.md
 docs/codigo_fonte_*.txt
 docs/pagina_individual_leadsYelp.txt
+docs/HTML DASILVA YELP.txt
 docs/Base VA - KACS Cleaning.txt
 docs/Base VA - Jhey's Cleaning.txt
 docs/guia_precificacao.xlsx
@@ -20,5 +21,7 @@ route-relay/.wrangler/
 # Dependencies and local tooling
 node_modules/
 coverage/
+test-results/
+playwright-report/
 .DS_Store
 Thumbs.db

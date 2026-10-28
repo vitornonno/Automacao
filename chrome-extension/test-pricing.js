@@ -32,6 +32,22 @@ quote = engine.calculateQuote({ companyName: "Jhey's Cleaning", bedrooms: 3, bat
 check(quote.status === 'move_type_required', 'Jhey’s combined move requests must require a specific move type');
 quote = engine.calculateQuote({ companyName: "Jhey's Cleaning", bedrooms: 3, bathrooms: 2, serviceType: 'Move-Out Cleaning' });
 check(quote.service === 'move_out' && quote.amount === 410 && quote.priceRange.maximum === 510, 'Jhey’s Move-Out quote must use its dedicated table value');
+const configuredCompanies = ['KACS Cleaning Services', "Jhey's Cleaning", 'Da Silva Cleaning Services', 'UT Cleans', "Mary's House Cleaning", 'Gleam Team Housecleaning', 'Express House Cleaning'];
+for (const companyName of configuredCompanies) {
+  const lead = { companyName, squareFeet: 2230 };
+  const moveIn = engine.calculateQuote({ ...lead, serviceType: 'Move-in Cleaning' });
+  const moveOut = engine.calculateQuote({ ...lead, serviceType: 'Move-out Cleaning' });
+  if (moveIn.company === 'kacs') {
+    check(moveIn.baseHours === 7.5 && moveOut.baseHours === 8.5, `${companyName}: move estimates must use separate hours`);
+  } else {
+    check(moveIn.amount === 560 && moveOut.amount === 625, `${companyName}: move estimates must use separate prices`);
+    check(messages.approvedMessage({ lead, quote: moveIn }).includes('560') && messages.approvedMessage({ lead, quote: moveOut }).includes('625'), `${companyName}: copied messages must include the selected price`);
+  }
+}
+check(configuredCompanies.every((companyName) => {
+  const moveQuote = engine.calculateQuote({ companyName, bedrooms: 3, bathrooms: 2, serviceType: 'Move-In Cleaning' });
+  return moveQuote.status === 'ready_for_review' && moveQuote.service === 'move_in';
+}), 'Selecting Move-In manually must unlock a quote for every configured company');
 quote = engine.calculateQuote({ companyName: 'Gleam Team Housecleaning', bedrooms: 3, bathrooms: 2, serviceType: 'First Cleaning' });
 check(quote.company === 'gleam' && quote.amount === 250 && quote.priceRange.maximum === 350 && !quote.discount, 'A blank discount field must preserve the regular Gleam price without mentioning a discount');
 quote = engine.calculateQuote({ companyName: 'Gleam Team Housecleaning', bedrooms: 3, bathrooms: 2, serviceType: 'Move-In Cleaning' });
@@ -40,12 +56,38 @@ quote = engine.calculateQuote({ companyName: 'Gleam Team Housecleaning', bedroom
 check(quote.service === 'move_out' && quote.amount === 410 && !quote.discount, 'Gleam Move-Out must remain separate without a selected discount');
 quote = engine.calculateQuote({ companyName: "Mary's House Cleaning", bedrooms: 3, bathrooms: 2, serviceType: 'Deep Cleaning' }, { discountPercent: 10, discountTarget: 'deep_cleaning' });
 check(quote.amount === 295 && quote.discount?.percentage === 10, 'A selected discount must apply to the matching primary cleaning type and round up to $5');
+check(quote.priceRange.maximum === 385, 'The discount must apply to both ends of the original price range');
+for (const [serviceType, expectedMin, expectedMax] of [['Move-in Cleaning', 292, 372], ['Move-out Cleaning', 328, 408]]) {
+  const discounted = engine.calculateQuote({ companyName: "Jhey's Cleaning", squareFeet: 1500, serviceType }, { discountPercent: 20 });
+  check(discounted.priceRange.minimum === Math.ceil(expectedMin / 5) * 5 && discounted.priceRange.maximum === Math.ceil(expectedMax / 5) * 5, `${serviceType} must receive the percentage without a separate discount target`);
+}
+for (const companyName of configuredCompanies.filter((name) => name !== 'KACS Cleaning Services')) {
+  const lead = { companyName, squareFeet: 1600, serviceType: 'Deep Cleaning' };
+  const freeQuote = engine.calculateQuote(lead, { discountPercent: 100, discountTarget: 'deep_cleaning' });
+  const message = messages.approvedMessage({ lead, quote: freeQuote });
+  check(freeQuote.priceRange.minimum === 0 && freeQuote.priceRange.maximum === 0 && message.includes('$0'), `${companyName}: 100% discount must result in a usable $0 quote`);
+}
+for (const companyName of configuredCompanies) {
+  const large = engine.calculateQuote({ companyName, bedrooms: 10, bathrooms: 8, serviceType: 'Deep Cleaning' });
+  check(['manual_quote_required', 'manual_hours_required'].includes(large.status) && !large.size.band, `${companyName}: unmatched home dimensions must require manual review`);
+}
+const maryDiscountMessage = messages.approvedMessage({ lead: {}, quote });
+check(!maryDiscountMessage.includes('first-cleaning price'), 'A discounted deep cleaning must not be described as First Cleaning');
 quote = engine.calculateQuote({ companyName: "Jhey's Cleaning", bedrooms: 3, bathrooms: 2, serviceType: 'Regular home cleaning', frequency: 'Biweekly' }, { discountPercent: 20, discountTarget: 'regular' });
 check(quote.amount === 250 && quote.recurringCleaning?.priceRange?.minimum === 140 && quote.recurringCleaning?.priceRange?.maximum === 160 && quote.recurringCleaning?.discount?.percentage === 20, 'A regular-cleaning discount must apply only to the recurring rate');
 quote = engine.calculateQuote({ companyName: "Jhey's Cleaning", bedrooms: 3, bathrooms: 2, serviceType: 'Regular home cleaning', frequency: 'Every 2 weeks' }, { discountPercent: 10, discountTarget: 'first_cleaning' });
 check(quote.amount === 250 && !quote.discount && quote.recurringCleaning?.priceRange?.minimum === 170 && quote.recurringCleaning?.priceRange?.maximum === 200 && quote.recurringCleaning?.firstRecurringDiscount?.priceRange?.minimum === 155 && quote.recurringCleaning?.firstRecurringDiscount?.priceRange?.maximum === 180, 'A First Cleaning discount on a recurring request must apply only to the first regular visit');
 quote = engine.calculateQuote({ companyName: "Jhey's Cleaning", bedrooms: 3, bathrooms: 2, serviceType: 'Regular home cleaning', frequency: 'Every 2 weeks' }, { discountPercent: 10 });
 check(quote.recurringCleaning?.firstRecurringDiscount?.percentage === 10, 'A filled discount percentage without a target should default to the service currently being quoted');
+for (const companyName of configuredCompanies) {
+  const lead = { companyName, bedrooms: 4, bathrooms: 3, serviceType: 'Regular home cleaning', frequency: 'Every 2 weeks' };
+  const discounted = engine.calculateQuote(lead, { discountPercent: 20 });
+  check(discounted.recurringCleaning?.firstRecurringDiscount?.percentage === 20, `${companyName}: First Cleaning discount must apply to the first recurring appointment`);
+  check(messages.approvedMessage({ lead, quote: discounted }).includes('20% new customer discount on your first bi-weekly regular cleaning'), `${companyName}: recurring discount must appear in the message`);
+}
+const weeklyDiscountLead = { companyName: "Jhey's Cleaning", bedrooms: 3, bathrooms: 2, serviceType: 'Regular home cleaning', frequency: 'Weekly' };
+const weeklyDiscountQuote = engine.calculateQuote(weeklyDiscountLead, { discountPercent: 10 });
+check(weeklyDiscountQuote.recurringCleaning?.firstRecurringDiscount?.percentage === 10 && !weeklyDiscountQuote.recurringCleaning?.priceRange && messages.approvedMessage({ lead: weeklyDiscountLead, quote: weeklyDiscountQuote }).includes('10% new customer discount on your first weekly regular cleaning'), 'Weekly discounts must be explained without inventing a recurring price');
 check(engine.resolveCompany('Da Silva Cleaning Services') === 'dasilva' && engine.resolveCompany('Express House Cleaning') === 'express' && engine.resolveCompany('UT Cleans') === 'utcleans' && engine.resolveCompany("Mary's House Cleaning") === 'marys', 'All configured company names must be auto-detected');
 check(engine.resolveCompany('Gleam Team') === 'gleam' && engine.resolveCompany('DaSilva Cleaning') === 'dasilva', 'Yelp short business names must be auto-detected');
 check(engine.resolveService('Regular home cleaning', 'Once') === 'first_cleaning', 'One-time regular cleaning should map to First Cleaning');
@@ -63,9 +105,44 @@ check(yelpState, 'The Yelp Apollo state should parse from the saved source');
 const yelpLead = extractor.extractYelpLeadFromState(yelpState, '/leads_center/FAHbiW72jLTiNDvcOptrfg/leads/N_elcsrAMm0NNcBkVgp1Yw');
 check(yelpLead?.companyName === 'KACS Cleaning Services' && yelpLead.bedrooms && yelpLead.bathrooms, 'Yelp lead details should be extracted from the active route');
 check(extractor.firstName('Adrienne M.') === 'Adrienne', 'Only the first customer name should be used');
-check(extractor.yelpBusinessNameFromText('Jhey’s Cleaning Services\nMy Leads') === 'Jhey’s Cleaning Services', 'Jhey’s Yelp DOM business name should be detected');
-check(extractor.yelpBusinessNameFromText('KACS Cleaning Services LLC') === 'KACS Cleaning Services', 'KACS Yelp DOM business name should be detected');
-check(extractor.yelpBusinessNameFromText('Gleam Team\nMy Leads') === 'Gleam Team Housecleaning' && extractor.yelpBusinessNameFromText('DaSilva Cleaning') === 'Da Silva Cleaning Services', 'Yelp short business names should resolve to their configured companies');
+check(extractor.isCustomerName('Alejandra C.') && extractor.isCustomerName('Alejandra Castillo') && extractor.isCustomerName('Alejandra') && !extractor.isCustomerName('Contacted Lead Details'), 'Visible Yelp customer names must support first name, initials, and full names without accepting page headings');
+const yelpBusinessCases = [
+  ['Jhey’s Cleaning Services\nMy Leads', 'Jhey’s Cleaning Services'],
+  ['KACS Cleaning Services LLC', 'KACS Cleaning Services'],
+  ['DaSilva Cleaning', 'Da Silva Cleaning Services'],
+  ['UT Cleans\nMy Leads', 'UT Cleans'],
+  ["Mary's House Cleaning", "Mary's House Cleaning"],
+  ['Gleam Team\nMy Leads', 'Gleam Team Housecleaning'],
+  ['Express House Cleaning', 'Express House Cleaning']
+];
+check(yelpBusinessCases.every(([source, expected]) => extractor.yelpBusinessNameFromText(source) === expected), 'Every configured company must be recognized from Yelp DOM text');
+for (const [index, [businessName]] of yelpBusinessCases.entries()) {
+  const companyId = `company${index}`;
+  const state = {
+    [`Business:${companyId}`]: { __typename: 'Business', encid: companyId, name: businessName.split('\n')[0] },
+    'Business:other': { __typename: 'Business', encid: 'other', name: 'KACS Cleaning Services' },
+    'Lead:one': { __typename: 'Lead', encid: 'one', project: { __ref: 'Project:one' } },
+    'Lead:two': { __typename: 'Lead', encid: 'two', project: { __ref: 'Project:two' } },
+    'Project:one': { __typename: 'Project', jobSummaryTitle: 'Deep cleaning', user: { __ref: 'User:one' } },
+    'Project:two': { __typename: 'Project', jobSummaryTitle: 'Deep cleaning', user: { __ref: 'User:two' } },
+    'User:one': { displayName: 'Maria Silva' },
+    'User:two': { displayName: 'João Pereira' }
+  };
+  const one = extractor.extractYelpLeadFromState(state, `/leads_center/${companyId}/leads/one`);
+  const two = extractor.extractYelpLeadFromState(state, `/leads_center/${companyId}/leads/two`);
+  check(engine.resolveCompany(one.companyName) === ['jheys', 'kacs', 'dasilva', 'utcleans', 'marys', 'gleam', 'express'][index], `${businessName}: Apollo business should resolve to the correct company`);
+  check(one.customerName === 'Maria' && two.customerName === 'João', `${businessName}: customer names must come from the active lead`);
+  delete state['User:one'].displayName;
+  check(extractor.extractYelpLeadFromState(state, `/leads_center/${companyId}/leads/one`).customerName === null, `${businessName}: missing names must not be borrowed from another lead`);
+}
+const multiBusinessApolloState = {
+  'Lead:target': { __typename: 'Lead', encid: 'target', business: { __ref: 'Business:ut' }, project: { __ref: 'Project:target' } },
+  'Project:target': { __typename: 'Project', jobSummaryTitle: 'Deep cleaning', description: '', surveyQuestionAnswers: [] },
+  'Business:wrong': { __typename: 'Business', name: 'KACS Cleaning Services' },
+  'Business:ut': { __typename: 'Business', encid: 'ut', name: 'UT Cleans' }
+};
+check(extractor.extractYelpLeadFromState(multiBusinessApolloState, '/leads_center/ut/leads/target')?.companyName === 'UT Cleans', 'Apollo extraction must use the route business instead of the first cached business');
+check(extractor.extractYelpLeadFromState(multiBusinessApolloState, '/leads_center/unknown/leads/target')?.companyName === null, 'Apollo extraction must not use a business unrelated to the current route');
 check(extractor.squareFeetFromText('We have a townhome about 2000 sq ft.') === '2000', 'Yelp details should recognize square footage written before the unit');
 check(extractor.surveyAnswer({ surveyQuestionAnswers: [{ question: 'Do you require any of these cleaning product types?', answers: ['Eco-friendly or green', 'Non-toxic', 'Pet-safe'] }] }, /cleaning product types/i) === 'Eco-friendly or green, Non-toxic, Pet-safe', 'All Yelp multi-select answers should be retained');
 check(engine.calculateQuote(yelpLead).service === 'first_cleaning', 'The saved Yelp example should resolve Regular home cleaning / Once');
@@ -92,7 +169,7 @@ check(missingSizeMessage.includes('Hi Sample,') && missingSizeMessage.includes('
 const jheysMessage = messages.approvedMessage({ lead: { customerName: 'Marvin', bedrooms: 4, bathrooms: 4 }, quote: { company: 'jheys', serviceLabel: 'Deep Cleaning', amount: 900 } });
 check(jheysMessage.includes('Hi Marvin,') && jheysMessage.includes('welcoming new clients') && jheysMessage.includes('Estimated investment: $900 to $1000') && !jheysMessage.includes('discount applied') && !jheysMessage.includes('quick walkthrough'), 'Jhey’s approval message should omit discounts when none are selected and avoid an arrival walkthrough or scope confirmation');
 const gleamMessage = messages.approvedMessage({ lead: { customerName: 'Marvin' }, quote: { company: 'gleam', service: 'move_in', serviceLabel: 'Move-in Cleaning', amount: 310, priceRange: { minimum: 310, maximum: 410 }, discount: { percentage: 15 } } });
-check(gleamMessage.includes('Gleam Team') && gleamMessage.includes('15% discount applied') && gleamMessage.includes('$310–$410'), 'Gleam approval message must show its discounted range and discount');
+check(gleamMessage.includes('Gleam Team') && gleamMessage.includes('15% new customer discount applied') && gleamMessage.includes('$310–$410') && (gleamMessage.match(/15%/g) || []).length === 1, 'Gleam approval message must show the discount once');
 const expressArchive = messages.archivingMessage('express', { customerName: 'Marvin' });
 check(expressArchive.includes('Express House Cleaning') && expressArchive.includes('(510) 757-9573'), 'Express archiving message must use its script contact details');
 const limitationsMessage = messages.approvedMessage({ lead: { customerName: 'Sample', bedrooms: 2, bathrooms: 1, extraServices: 'Pet odor treatment, Rug cleaning, Upholstery cleaning' }, quote: { company: 'kacs', service: 'deep_cleaning', serviceLabel: 'Deep Cleaning', estimatedHours: { minimum: 2, maximum: 3.5 } } });

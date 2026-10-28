@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="service-picker.css">
+    <title>Cleaning type</title>
+  </head>
+  <body>
+    <div id="move-prompt" hidden>
+      <strong>Is this Move-in or Move-out?</strong>
+      <div><button type="button" data-service="move_in">Move-in</button><button type="button" data-service="move_out">Move-out</button></div>
+    </div>
+    <select id="service-type" aria-label="Cleaning type">
+      <option value="">Select cleaning type</option>
+      <option value="deep_cleaning">Deep Cleaning</option>
+      <option value="first_cleaning">First Cleaning</option>
+      <option value="move_in">Move-in Cleaning</option>
+      <option value="move_out">Move-out Cleaning</option>
+      <option value="post_construction">Post-Construction Cleaning</option>
+    </select>
+    <script src="service-picker.js"></script>
+  </body>
+</html>

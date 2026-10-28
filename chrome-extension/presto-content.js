@@ -103,7 +103,8 @@ function moneyValue(value) {
   const comma = raw.lastIndexOf(',');
   const dot = raw.lastIndexOf('.');
   let normalized = raw;
-  if (comma > dot) normalized = raw.replace(/\./g, '').replace(',', '.');
+  if (comma > dot && dot === -1 && /^\d{1,3}(,\d{3})+$/.test(raw)) normalized = raw.replace(/,/g, '');
+  else if (comma > dot) normalized = raw.replace(/\./g, '').replace(',', '.');
   else if (dot > comma && comma !== -1) normalized = raw.replace(/,/g, '');
   const amount = Number(normalized);
   return Number.isFinite(amount) ? amount : null;
@@ -153,6 +154,14 @@ function calendarNavigationButton(direction) {
     .find((button) => button.querySelector(icon)) || null;
 }
 
+function displayedCalendarMonth() {
+  const label = text(document.querySelector('.services-calendar-container .main-app-bar span[role="button"].text-capitalize'));
+  const match = label.match(/\b([A-Za-z]+)\s+(\d{4})\b/);
+  if (!match) return null;
+  const month = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'].indexOf(match[1].slice(0, 3).toLowerCase());
+  return month < 0 ? null : `${match[2]}-${String(month + 1).padStart(2, '0')}`;
+}
+
 function mergeById(records) {
   return [...new Map(records.map((record) => [record.id || record.date, record])).values()]
     .sort((a, b) => String(a.date).localeCompare(String(b.date)));
@@ -160,6 +169,7 @@ function mergeById(records) {
 
 async function withNextMonthIfNeeded(read, debug) {
   debugEvent(debug, 'Availability window', { start: todayInCalifornia(), end: availabilityEndDate(), crossesMonth: windowCrossesMonth() });
+  if (displayedCalendarMonth() !== todayInCalifornia().slice(0, 7)) throw new Error('Open the current month in the Presto calendar before scanning.');
   const currentMonthRecords = await read();
   debugEvent(debug, 'Current month read', { records: currentMonthRecords.length });
   if (!windowCrossesMonth()) return currentMonthRecords;
@@ -167,19 +177,24 @@ async function withNextMonthIfNeeded(read, debug) {
   const previousButton = calendarNavigationButton('previous');
   if (!nextButton || !previousButton) {
     debugEvent(debug, 'Month navigation unavailable', { hasNext: Boolean(nextButton), hasPrevious: Boolean(previousButton) });
-    return currentMonthRecords;
+    throw new Error('Calendar month navigation is unavailable. No schedule was saved.');
   }
   debugEvent(debug, 'Navigating to next month');
   nextButton.click();
   await sleep(1000);
+  let navigated = false;
   try {
+    if (displayedCalendarMonth() !== availabilityEndDate().slice(0, 7)) throw new Error('The next calendar month did not load. No schedule was saved.');
+    navigated = true;
     const nextMonthRecords = await read();
     debugEvent(debug, 'Next month read', { records: nextMonthRecords.length });
     return mergeById([...currentMonthRecords, ...nextMonthRecords]);
   } finally {
-    previousButton.click();
-    await sleep(750);
-    debugEvent(debug, 'Restored original month');
+    if (navigated) {
+      previousButton.click();
+      await sleep(750);
+      debugEvent(debug, 'Restored original month');
+    }
   }
 }
 

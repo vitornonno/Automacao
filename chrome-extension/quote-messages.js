@@ -45,6 +45,8 @@
     if (recurring.firstRecurringDiscount?.priceRange) {
       const discount = recurring.firstRecurringDiscount;
       section.push('', `✨ ${discount.percentage}% new customer discount on your first ${cadence.toLowerCase()} regular cleaning: approximately $${discount.priceRange.minimum} - $${discount.priceRange.maximum} per visit. Future regular cleanings return to $${discount.standardPriceRange.minimum} - $${discount.standardPriceRange.maximum} per visit.`);
+    } else if (recurring.firstRecurringDiscount?.percentage) {
+      section.push('', `✨ ${recurring.firstRecurringDiscount.percentage}% new customer discount on your first ${cadence.toLowerCase()} regular cleaning. Future regular cleanings return to the regular rate confirmed after the First Cleaning.`);
     }
     section.push('', 'The exact recurring rate will be confirmed after the First Cleaning.');
     return section;
@@ -555,11 +557,10 @@
     } else if (quote.company === 'utcleans') {
       message.push(`Thank you for providing your home details. For your home, here is what we suggest:`, '', `🧼 Initial Service: ${quote.serviceLabel}`, `💲 First Visit Estimate: ${price}`, '👥 Dedicated Team: 2 cleaners', '', 'Our first service focuses on creating a fresh baseline throughout your space, allowing future maintenance cleanings to be streamlined, consistent, and budget-friendly.');
     } else if (quote.company === 'marys') {
-      const priceLabel = quote.discount?.percentage ? '💲 Special first-cleaning price' : '💲 Estimated price';
+      const priceLabel = quote.discount?.percentage ? '💲 Special price' : '💲 Estimated price';
       message.push(`Thank you for providing the details about your home. We truly appreciate the information!`, '', `🧼 Recommended service: ${quote.serviceLabel}`, ...homeDetails(lead), `${priceLabel}: ${price}`, '', 'The final price may depend on the overall condition of the home and the level of cleaning required.', '', 'Our first visit is designed to establish a thorough cleaning foundation, making future maintenance cleanings more efficient and consistent.', '', 'Would you like us to check availability for your preferred date?');
     } else if (quote.company === 'gleam') {
       message.push(`Thank you for reaching out to ${company.shortName}! 😊`, '', "Based on what you shared, here's our estimate for your home:", '', `🧽 ${quote.serviceLabel}`, `💲 Estimated price: ${price}`);
-      if (quote.discount?.percentage) message.push(`✨ ${quote.discount.percentage}% discount applied to this initial cleaning`);
       message.push('👥 Team of 2 cleaners', '', '🌱 Green cleaning products', '🧒 Kid-safe', '🐶 Pet-safe', '🚫 Non-toxic products', '', 'Our standard cleaning includes dusting and wiping surfaces, including shelves, cleaning kitchen and bathroom surfaces, wiping down the exterior of appliances, vacuuming, mopping, and general tidying of the areas we clean.', '', "The initial cleaning price is an estimate and will depend on the home's size, condition, and cleaning needs.");
     } else {
       message.push('Thank you so much for contacting Express House Cleaning! We truly appreciate your interest in our services.', '', "Based on the information provided, here's our estimate for your home:", '', `🧼 ${quote.serviceLabel}`, '', `💲 Estimated price: ${price}`, '👥 Team: 2 professional cleaners', '', "The final price will depend on the home's overall condition and the level of detail required.");
@@ -584,9 +585,9 @@
       return kacsMessage(review);
     }
     if (quote.company === 'jheys' && quote.status === 'missing_size') return jheysMissingSizeMessage(review);
-    if (quote.company === 'jheys' && quote.amount) return jheysMessage(review);
+    if (quote.company === 'jheys' && Number.isFinite(quote.amount)) return jheysMessage(review);
     if (fixedPriceCompanies[quote.company] && quote.status === 'missing_size') return fixedPriceMissingSizeMessage(review);
-    if (fixedPriceCompanies[quote.company] && quote.amount) return fixedPriceMessage(review);
+    if (fixedPriceCompanies[quote.company] && Number.isFinite(quote.amount)) return fixedPriceMessage(review);
     return 'This lead needs a manual review before a message can be prepared.';
   }
 
