@@ -1,4 +1,83 @@
+const UPDATE_HOST = 'com.prestova.cleaning_updater';
+const UPDATE_STATE_KEY = 'extensionUpdateStatus';
+let updateInProgress = false;
+
+function nativeUpdateRequest(action) {
+  return new Promise((resolve, reject) => {
+    let port;
+    try { port = chrome.runtime.connectNative(UPDATE_HOST); }
+    catch (error) { reject(error); return; }
+    let done = false;
+    const finish = (error, value) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timeout);
+      try { port.disconnect(); } catch { /* Already disconnected. */ }
+      if (error) reject(error); else resolve(value);
+    };
+    const timeout = setTimeout(() => finish(new Error('O auxiliar demorou para responder. Tente novamente.')), 120000);
+    port.onMessage.addListener((response) => finish(null, response));
+    port.onDisconnect.addListener(() => {
+      const reason = chrome.runtime.lastError?.message || '';
+      const message = /native messaging host not found|specified native messaging host not found/i.test(reason)
+        ? 'Auxiliar de atualização não encontrado. Instale ou configure o auxiliar neste computador.'
+        : reason || 'O auxiliar não respondeu. Verifique sua instalação.';
+      finish(new Error(message));
+    });
+    try { port.postMessage({ action }); } catch (error) { finish(error); }
+  });
+}
+
+async function setUpdateStatus(stage, message, version = null) {
+  await chrome.storage.local.set({ [UPDATE_STATE_KEY]: { stage, message, version, updatedAt: new Date().toISOString() } });
+}
+
+async function notifyOpenLeadPages() {
+  const tabs = await chrome.tabs.query({ url: ['https://*.yelp.com/*', 'https://*.yelp.com.br/*', 'https://*.thumbtack.com/*'] });
+  await Promise.allSettled(tabs.filter((tab) => Number.isInteger(tab.id)).map((tab) => chrome.tabs.sendMessage(tab.id, { type: 'SHOW_UPDATE_RELOAD_NOTICE' }, { frameId: 0 })));
+}
+
+async function checkAndInstallUpdate() {
+  await setUpdateStatus('checking', 'Verificando atualizações…');
+  try {
+    const check = await nativeUpdateRequest('check');
+    if (!check?.ok) throw new Error(check?.message || 'Não foi possível verificar atualizações.');
+    if (check.status === 'up_to_date') {
+      await setUpdateStatus('up_to_date', 'A extensão está atualizada.', check.currentVersion || null);
+      return;
+    }
+    if (check.status !== 'available') throw new Error('O auxiliar retornou uma resposta inesperada.');
+    await setUpdateStatus('installing', 'Atualização encontrada. Instalando…', check.availableVersion || null);
+    const installed = await nativeUpdateRequest('install');
+    if (!installed?.ok) throw new Error(installed?.message || 'Não foi possível instalar a atualização.');
+    if (installed.status === 'up_to_date') {
+      await setUpdateStatus('up_to_date', 'A extensão está atualizada.', installed.currentVersion || null);
+      return;
+    }
+    if (installed.status !== 'installed') throw new Error('O auxiliar não confirmou a instalação.');
+    await setUpdateStatus('installed', 'Atualização instalada. Atualize a página do Yelp para usar a nova versão.', installed.availableVersion || null);
+    // A barra permanece na página mesmo após o recarregamento da extensão.
+    try { await notifyOpenLeadPages(); } catch { /* O aviso persistirá no popup. */ }
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    chrome.runtime.reload();
+  } catch (error) {
+    await setUpdateStatus('error', error?.message || 'Não foi possível verificar atualizações.');
+  }
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type === 'CHECK_EXTENSION_UPDATE') {
+    if (sender.id !== chrome.runtime.id || sender.url !== chrome.runtime.getURL('popup.html')) {
+      sendResponse({ ok: false, error: 'Solicitação de atualização não autorizada.' });
+      return undefined;
+    }
+    if (updateInProgress) { sendResponse({ ok: false, error: 'Já existe uma verificação em andamento.' }); return undefined; }
+    updateInProgress = true;
+    checkAndInstallUpdate().then(() => sendResponse({ ok: true }))
+      .catch((error) => sendResponse({ ok: false, error: error?.message || 'Falha na atualização.' }))
+      .finally(() => { updateInProgress = false; });
+    return true;
+  }
   if (message.type === 'PICKER_SERVICE_SELECTED') {
     if (sender.id !== chrome.runtime.id || !sender.tab?.id || !sender.url?.startsWith(chrome.runtime.getURL('service-picker.html'))) {
       sendResponse({ ok: false });

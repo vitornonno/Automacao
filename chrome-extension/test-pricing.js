@@ -106,6 +106,19 @@ const yelpLead = extractor.extractYelpLeadFromState(yelpState, '/leads_center/FA
 check(yelpLead?.companyName === 'KACS Cleaning Services' && yelpLead.bedrooms && yelpLead.bathrooms, 'Yelp lead details should be extracted from the active route');
 check(extractor.firstName('Adrienne M.') === 'Adrienne', 'Only the first customer name should be used');
 check(extractor.isCustomerName('Alejandra C.') && extractor.isCustomerName('Alejandra Castillo') && extractor.isCustomerName('Alejandra') && !extractor.isCustomerName('Contacted Lead Details'), 'Visible Yelp customer names must support first name, initials, and full names without accepting page headings');
+const mockCustomerRegion = (label, visible = true) => ({
+  closest: () => null,
+  getBoundingClientRect: () => ({ width: visible ? 100 : 0, height: visible ? 30 : 0 }),
+  getAttribute: () => label,
+  querySelectorAll: () => [{ innerText: label }]
+});
+const previousDocument = global.document;
+let regions = [mockCustomerRegion('Julie Z.'), mockCustomerRegion('Other Person', false)];
+global.document = { querySelectorAll: (selector) => selector === '[role="region"][aria-label]' ? regions : [] };
+check(extractor.visibleCustomerName() === 'Julie', 'A visible customer profile outside main must be recognized');
+regions.push(mockCustomerRegion('Another Person'));
+check(extractor.visibleCustomerName() === null, 'Ambiguous visible customer profiles must not select an arbitrary name');
+global.document = previousDocument;
 const yelpBusinessCases = [
   ['Jhey’s Cleaning Services\nMy Leads', 'Jhey’s Cleaning Services'],
   ['KACS Cleaning Services LLC', 'KACS Cleaning Services'],
@@ -171,6 +184,13 @@ check(jheysMessage.includes('Hi Marvin,') && jheysMessage.includes('welcoming ne
 const gleamMessage = messages.approvedMessage({ lead: { customerName: 'Marvin' }, quote: { company: 'gleam', service: 'move_in', serviceLabel: 'Move-in Cleaning', amount: 310, priceRange: { minimum: 310, maximum: 410 }, discount: { percentage: 15 } } });
 check(gleamMessage.includes('Gleam Team') && gleamMessage.includes('15% new customer discount applied') && gleamMessage.includes('$310–$410') && (gleamMessage.match(/15%/g) || []).length === 1, 'Gleam approval message must show the discount once');
 const expressArchive = messages.archivingMessage('express', { customerName: 'Marvin' });
+for (const company of Object.keys(engine.COMPANIES)) {
+  const lead = { customerName: 'Marvin' };
+  check(messages.archivingMessage(company, lead).includes('Hi Marvin'), `${company}: archiving must include the customer name`);
+  const status = messages.followUpStatus(company, lead, '');
+  const items = Array.isArray(status) ? status : status.situations.flatMap((situation) => situation.messages);
+  check(items.length > 0 && items.every((item) => item.message.includes('Hi Marvin')), `${company}: every follow-up must include the customer name`);
+}
 check(expressArchive.includes('Express House Cleaning') && expressArchive.includes('(510) 757-9573'), 'Express archiving message must use its script contact details');
 const limitationsMessage = messages.approvedMessage({ lead: { customerName: 'Sample', bedrooms: 2, bathrooms: 1, extraServices: 'Pet odor treatment, Rug cleaning, Upholstery cleaning' }, quote: { company: 'kacs', service: 'deep_cleaning', serviceLabel: 'Deep Cleaning', estimatedHours: { minimum: 2, maximum: 3.5 } } });
 check(limitationsMessage.includes('🧼 A quick note about the additional services requested:') && limitationsMessage.includes('• Professional rug shampoo/extraction cleaning is not included') && !limitationsMessage.includes('carpet or rug shampoo') && limitationsMessage.includes('• Professional upholstery cleaning is not included') && limitationsMessage.includes('• Specialized pet odor treatment and guaranteed odor removal are not included') && !limitationsMessage.includes('• we ') && !limitationsMessage.includes('⚠️ Please note'), 'Multiple requested limitations must use one softer grouped note');

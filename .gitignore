@@ -5,6 +5,7 @@ MEMORY.md
 docs/codigo_fonte_*.txt
 docs/pagina_individual_leadsYelp.txt
 docs/HTML DASILVA YELP.txt
+docs/nome_cliente.txt
 docs/Base VA - KACS Cleaning.txt
 docs/Base VA - Jhey's Cleaning.txt
 docs/guia_precificacao.xlsx
@@ -20,6 +21,9 @@ route-relay/.wrangler/
 
 # Dependencies and local tooling
 node_modules/
+updater/**/bin/
+updater/**/obj/
+updater/dist/
 coverage/
 test-results/
 playwright-report/

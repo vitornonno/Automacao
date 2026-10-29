@@ -2,7 +2,7 @@
 (function contentModule() {
   'use strict';
 
-  const BUILD_VERSION = '0.1.25';
+  const BUILD_VERSION = '0.1.28';
   let companyOverride = null;
   let discountPercent = '';
   let lead = null;
@@ -439,7 +439,7 @@
     return quote?.status === 'ready_for_review' || (Object.hasOwn(CleaningQuoteEngine.COMPANIES, quote?.company) && quote?.status === 'missing_size');
   }
   function input(label, value, key, type = 'text') {
-    return `<label>${label}<input data-field="${key}" type="${type}" value="${value ?? ''}"></label>`;
+    return `<label>${label}<input data-field="${key}" type="${type}" value="${escapeHtml(value ?? '')}"></label>`;
   }
   function escapeHtml(value) {
     return String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]);
@@ -520,6 +520,7 @@
         <header><span>Lead estimate <small>v${BUILD_VERSION}</small></span><div><small>Debug below</small><button data-action="close" aria-label="Close">×</button></div></header>
       <section class="lead-fields">
         ${input('Company name', lead.companyName, 'companyName')}
+        ${input('Customer name', lead.customerName, 'customerName')}
         <label>Company pricing<select data-field="companyOverride"><option value="">Auto-detect</option>${Object.entries(CleaningQuoteEngine.COMPANIES).map(([key, company]) => `<option value="${key}" ${companyOverride === key ? 'selected' : ''}>${escapeHtml(company.name)}</option>`).join('')}</select></label>
         ${quote.company !== 'unknown' ? `<label>Discount %<input data-field="discountPercent" type="number" min="0" max="100" step="1" value="${escapeHtml(discountPercent)}" placeholder="Optional"></label>` : ''}
         ${serviceSelector(lead.serviceType)}
@@ -629,6 +630,17 @@
   function bindPanelControls() {
     bindManualServiceControl();
   }
+  function refreshCustomerNameForCopy() {
+    const field = root.querySelector('[data-field="customerName"]');
+    const entered = field?.value.trim();
+    if (entered) lead.customerName = CleaningLeadExtractor.firstName(entered);
+    else {
+      const current = CleaningLeadExtractor.extractLead();
+      lead.customerName = current?.id === lead.id ? current.customerName || null : null;
+    }
+    if (field) field.value = lead.customerName || '';
+    return Boolean(lead.customerName);
+  }
   async function recalculate({ serviceId = null } = {}) {
     panelEdited = true;
     root.querySelectorAll('[data-field]').forEach((field) => {
@@ -644,6 +656,18 @@
     render();
   }
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message?.type === 'SHOW_UPDATE_RELOAD_NOTICE') {
+      if (!document.getElementById('cleaning-update-reload-notice')) {
+        const notice = document.createElement('div');
+        notice.id = 'cleaning-update-reload-notice';
+        notice.setAttribute('role', 'status');
+        notice.textContent = 'Extensão atualizada. Atualize esta página para usar a nova versão.';
+        Object.assign(notice.style, { position: 'fixed', bottom: '16px', right: '16px', zIndex: '2147483647', padding: '12px 16px', background: '#174a8b', color: '#fff', borderRadius: '8px', boxShadow: '0 4px 16px #0004', font: '14px Arial, sans-serif' });
+        (document.body || document.documentElement).append(notice);
+      }
+      sendResponse({ ok: true });
+      return undefined;
+    }
     if (message?.type !== 'SET_ACTIVE_LEAD_SERVICE' && message?.type !== 'PICKER_SERVICE_APPLY') return undefined;
     if (message.type === 'PICKER_SERVICE_APPLY' && message.nonce !== servicePickerNonce) {
       sendResponse({ ok: false, error: 'Invalid selector session.' });
@@ -751,6 +775,7 @@
       render();
     }
     if (action === 'copy-follow-up' && canCopyApprovedMessage()) {
+      const hasCustomerName = refreshCustomerNameForCopy();
       const status = CleaningQuoteMessages.followUpStatus(quote.company, lead, conversationText());
       const number = Number(event.target.dataset.followUpNumber);
       const situation = Number(event.target.dataset.followUpSituation);
@@ -764,7 +789,7 @@
       } else try {
         await navigator.clipboard.writeText(followUp.message);
         const label = Array.isArray(status) ? `Follow-up ${followUp.number}` : `Situation ${situation}, follow-up ${stage}`;
-        confirmationFeedback = `${label} copied to clipboard. Review it, then paste it into Yelp when ready.`;
+        confirmationFeedback = hasCustomerName ? `${label} copied to clipboard. Review it, then paste it into Yelp when ready.` : `${label} copied with “there”: customer name was not found. Enter it above and copy again.`;
         logDebug('Follow-up copied', { company: quote.company, number: followUp.number || stage, situation: situation || null });
       } catch {
         confirmationFeedback = 'Could not copy the follow-up.';
@@ -773,8 +798,9 @@
     }
     if (action === 'copy-archiving' && canCopyApprovedMessage()) {
       try {
+        const hasCustomerName = refreshCustomerNameForCopy();
         await navigator.clipboard.writeText(CleaningQuoteMessages.archivingMessage(quote.company, lead));
-        confirmationFeedback = 'Archiving message copied to clipboard. Review it, then paste it into Yelp when ready.';
+        confirmationFeedback = hasCustomerName ? 'Archiving message copied to clipboard. Review it, then paste it into Yelp when ready.' : 'Archiving message copied with “there”: customer name was not found. Enter it above and copy again.';
         logDebug('Archiving message copied', { company: quote.company });
       } catch {
         confirmationFeedback = 'Could not copy the archiving message.';
@@ -930,7 +956,8 @@
   }, 400);
   let extractionTimer = null;
   const yelpLoadObserver = new MutationObserver((mutations) => {
-    if (queuedRoute || !isYelpLeadPage() || !root.isConnected || mutations.every((mutation) => root.contains(mutation.target))) return;
+    if (queuedRoute || !isYelpLeadPage() || !root.isConnected || mutations.every((mutation) =>
+      root.contains(mutation.target) || (mutation.addedNodes.length > 0 && [...mutation.addedNodes].every((node) => node.id === 'cleaning-update-reload-notice')))) return;
     if (quote?.status === 'ready_for_review') return;
     clearTimeout(extractionTimer);
     extractionTimer = setTimeout(() => {

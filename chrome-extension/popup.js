@@ -12,6 +12,36 @@ let prestoDebug = null;
 let selectedFilter = 'all';
 const activeLeadServiceElement = document.querySelector('#active-lead-service');
 const activeLeadServiceStatusElement = document.querySelector('#active-lead-service-status');
+const checkUpdateButton = document.querySelector('#check-update');
+const updateStatusElement = document.querySelector('#update-status');
+const UPDATE_STATE_KEY = 'extensionUpdateStatus';
+
+function showUpdateStatus(status) {
+  const version = chrome.runtime.getManifest().version;
+  updateStatusElement.textContent = status?.message || `Versão instalada: ${version}.`;
+}
+
+chrome.storage.local.get(UPDATE_STATE_KEY)
+  .then((records) => showUpdateStatus(records[UPDATE_STATE_KEY]))
+  .catch(() => showUpdateStatus(null));
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes[UPDATE_STATE_KEY]) showUpdateStatus(changes[UPDATE_STATE_KEY].newValue);
+});
+checkUpdateButton.addEventListener('click', async () => {
+  checkUpdateButton.disabled = true;
+  updateStatusElement.textContent = 'Verificando atualizações…';
+  try {
+    const response = await chrome.runtime.sendMessage({ type: 'CHECK_EXTENSION_UPDATE' });
+    if (!response?.ok) updateStatusElement.textContent = response?.error || 'Não foi possível iniciar a verificação.';
+  } catch {
+    // The popup is closed by runtime.reload after a successful update. Its
+    // result is saved in chrome.storage and remains visible on next opening.
+    const records = await chrome.storage.local.get(UPDATE_STATE_KEY).catch(() => ({}));
+    showUpdateStatus(records[UPDATE_STATE_KEY] || { message: 'Não foi possível iniciar a verificação.' });
+  } finally {
+    checkUpdateButton.disabled = false;
+  }
+});
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]);

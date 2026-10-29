@@ -7,7 +7,7 @@ const fs = require('fs');
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'yelp-playwright-'));
   const extension = path.resolve(__dirname, '..');
   const context = await chromium.launchPersistentContext(profile, {
-    channel: 'chromium', headless: false,
+    channel: 'msedge', headless: false,
     args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`]
   });
   const page = context.pages()[0] || await context.newPage();

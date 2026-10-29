@@ -77,8 +77,9 @@
   function visibleCustomerName() {
     // A generic bold heading can belong to a different lead or a page section.
     // Accept only a visible customer region whose profile link confirms its label.
-    const candidates = Array.from(document.querySelectorAll('main [role="region"][aria-label]'))
+    const candidates = Array.from(document.querySelectorAll('[role="region"][aria-label]'))
       .filter((region) => {
+        if (region.closest('#cleaning-quote-assistant')) return false;
         const rect = region.getBoundingClientRect();
         return rect.width > 0 && rect.height > 0;
       })
@@ -267,6 +268,6 @@
     };
   }
 
-  global.CleaningLeadExtractor = { extractLead, yelpApolloStateFromScripts, extractYelpLeadFromState, firstName, isCustomerName, yelpBusinessNameFromText, surveyAnswer, squareFeetFromText };
+  global.CleaningLeadExtractor = { extractLead, yelpApolloStateFromScripts, extractYelpLeadFromState, firstName, isCustomerName, visibleCustomerName, yelpBusinessNameFromText, surveyAnswer, squareFeetFromText };
   if (typeof module !== 'undefined') module.exports = global.CleaningLeadExtractor;
 })(globalThis);

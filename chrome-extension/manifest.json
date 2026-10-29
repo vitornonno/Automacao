@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "Cleaning Lead Quote Assistant",
-  "version": "0.1.25",
+  "version": "0.1.28",
   "description": "Calculates internal preliminary cleaning quotes for Yelp and Thumbtack leads.",
-  "permissions": ["storage", "activeTab", "clipboardWrite"],
+  "permissions": ["storage", "activeTab", "clipboardWrite", "nativeMessaging"],
   "host_permissions": ["https://*.yelp.com/*", "https://*.yelp.com.br/*", "https://*.thumbtack.com/*", "https://app.bepresto.com/*", "https://*.workers.dev/*"],
   "background": {
     "service_worker": "background.js",
