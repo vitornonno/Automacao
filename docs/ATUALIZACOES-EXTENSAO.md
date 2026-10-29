@@ -11,7 +11,7 @@ Distribuir atualizações da extensão aos VAs sem reenviar um ZIP a cada versã
 - O auxiliar consulta o repositório oficial, identifica uma versão superior e baixa para uma área temporária. A validação deve comprovar a autenticidade do pacote com uma assinatura independente da conta/release do GitHub, usando chave pública embutida no auxiliar e chave privada guardada fora do repositório. Um hash publicado junto do ZIP detecta corrupção, mas sozinho não protege contra alteração simultânea dos dois arquivos.
 - O pacote deve ser extraído em área temporária com limites de tamanho e validação de caminhos, conteúdo permitido, versão e manifesto. A instalação deve guardar backup recuperável e restaurá-lo em caso de falha. Não substituir a pasta inteira nem apagar arquivos do usuário.
 - Após sucesso confirmado, a extensão chama `chrome.runtime.reload()` e apresenta uma orientação para atualizar a página do Yelp. O teste piloto deve verificar que o ID e `chrome.storage.local` são preservados, assim como a fila e a configuração do relay.
-- O auxiliar e o botão foram implementados, mas ainda precisam de teste integrado no Chrome real e de publicação do canal assinado. É necessária uma etapa inicial de distribuição e registro; os VAs devem ser informados do que o programa faz.
+- O auxiliar e o botão foram implementados e o canal assinado de piloto foi publicado. Ainda é necessário teste integrado no Chrome real antes da distribuição. É necessária uma etapa inicial de distribuição e registro; os VAs devem ser informados do que o programa faz.
 
 Referências: https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging e https://developer.chrome.com/docs/extensions/reference/api/runtime/.
 
@@ -61,4 +61,4 @@ O relay de rotas é separado da extensão; não precisa ser reinstalado no compu
 
 ## Estado atual
 
-A chave de produção foi criada fora do repositório em `C:\Users\vitor\AppData\Local\CleaningLeadSigning\update-private.pem`. Ela deve receber backup protegido antes de distribuição. A chave pública está incorporada ao executável preparado. Os testes locais simulados e de assinatura passaram; o auxiliar ainda não foi instalado nos VAs e o canal assinado ainda não foi publicado. O ZIP de instalação inicial preparado localmente não comprova que a atualização completa funciona no Chrome real.
+A chave de produção foi criada fora do repositório em `C:\Users\vitor\AppData\Local\CleaningLeadSigning\update-private.pem`. Ela deve receber backup protegido antes de distribuição. A chave pública está incorporada ao executável preparado. Os testes locais simulados, de assinatura e de instalação passaram. A pré-release `v0.1.28` contém o pacote e o instalador de piloto; a pré-release `update-channel` contém o manifesto e a assinatura, cuja integridade foi verificada após download. O auxiliar ainda não foi instalado nos VAs e a atualização de uma versão para outra no Chrome real ainda não foi validada.
