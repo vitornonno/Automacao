@@ -6,9 +6,9 @@ Uma extensão local do Chrome para ajudar equipes de limpeza a revisar leads do 
 
 ## Downloads e instalação no Windows
 
-Na [release v0.1.38](https://github.com/vitornonno/Automacao/releases/tag/v0.1.38), baixe os arquivos separados:
+Na [release v0.1.39](https://github.com/vitornonno/Automacao/releases/tag/v0.1.39), baixe os arquivos separados:
 
-- **Presto-VA-Assistant-v0.1.38.zip**: extensão para o Chrome.
+- **Presto-VA-Assistant-v0.1.39.zip**: extensão para o Chrome.
 - **Presto-VA-Assistant-auto-updater-v0.1.38.zip**: auxiliar que permite verificar e instalar atualizações da extensão.
 
 Para uma instalação nova:
@@ -17,7 +17,7 @@ Para uma instalação nova:
 2. Extraia o ZIP do atualizador e execute `Instalar-Atualizador.cmd`. Na janela, selecione a mesma pasta da extensão e informe o ID mostrado em `chrome://extensions`.
 3. Reinicie o Chrome. No popup da extensão, use **Verificar atualizações**; após uma atualização, recarregue a página do Yelp.
 
-**Quem já usa a extensão:** instale primeiro o auxiliar v0.1.38 antes de atualizar a extensão. Os auxiliares anteriores não reconhecem o novo nome ou o arquivo da logo. O canal automático permanece na v0.1.36 durante a migração; a v0.1.38 está disponível para download e ainda não é oferecida pelo botão.
+**Quem já usa a extensão:** instale primeiro o auxiliar v0.1.38 antes de atualizar a extensão. Os auxiliares anteriores não reconhecem o novo nome ou o arquivo da logo. O canal automático permanece na v0.1.36 durante a migração; a v0.1.39 está disponível para download e ainda não é oferecida pelo botão.
 
 Perfis do Chrome que carregam a mesma pasta e usam o mesmo ID compartilham os arquivos da extensão, mas mantêm seus dados locais separados. O auxiliar é configurado para a conta do Windows, o ID e a pasta selecionados. Veja as [instruções do atualizador](updater/NativeHost/README.md).
 

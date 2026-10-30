@@ -2,7 +2,7 @@
 (function contentModule() {
   'use strict';
 
-  const BUILD_VERSION = '0.1.38';
+  const BUILD_VERSION = '0.1.39';
   let companyOverride = null;
   let discountPercent = '';
   let lead = null;
@@ -506,7 +506,7 @@
       ? `<button data-action="copy-details-request" ${requestedDetails.size ? '' : 'disabled'}>Copy selected details request</button>`
       : '<button data-action="open-details-request">Request details</button>';
     root.innerHTML = `
-        <header><span>Lead estimate <small>v${BUILD_VERSION}</small></span><div><button type="button" data-action="debug" aria-expanded="${debugVisible}">Debug</button><button data-action="close" aria-label="Close">×</button></div></header>
+        <header><span>Presto VA Assistant <small>v${BUILD_VERSION}</small></span><div><button type="button" data-action="debug" aria-expanded="${debugVisible}">Debug</button><button data-action="close" aria-label="Close">×</button></div></header>
       <section class="lead-fields">
         ${input('Company name', lead.companyName, 'companyName')}
         ${input('Customer name', lead.customerName, 'customerName')}

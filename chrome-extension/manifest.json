@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Presto VA Assistant",
-  "version": "0.1.38",
+  "version": "0.1.39",
   "description": "Calculates internal preliminary cleaning quotes for Yelp and Thumbtack leads.",
   "icons": { "128": "presto-logo.png" },
   "permissions": ["storage", "activeTab", "clipboardWrite", "nativeMessaging"],
