@@ -67,7 +67,7 @@ internal static class TestHarness
             foreach (var file in Files)
             {
                 using var writer = new StreamWriter(zip.CreateEntry("chrome_extension/" + file).Open(), new UTF8Encoding(false));
-                writer.Write(file == "manifest.json" ? Manifest("2.0") : "new-" + file);
+                writer.Write(file == "manifest.json" ? Manifest("2.0").Replace("Cleaning Lead Quote Assistant", "Presto VA Assistant") : "new-" + file);
             }
         return stream.ToArray();
     }

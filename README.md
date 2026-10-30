@@ -1,4 +1,4 @@
-# Cleaning Lead Quote Assistant
+# Presto VA Assistant
 
 Uma extensão local do Chrome para ajudar equipes de limpeza a revisar leads do Yelp, montar cotações preliminares e sugerir disponibilidade antes da resposta manual ao cliente.
 

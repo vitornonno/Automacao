@@ -1,4 +1,4 @@
-# Cleaning Lead Quote Assistant — Especificação operacional
+# Presto VA Assistant — Especificação operacional
 
 ## Objetivo e limites
 
@@ -164,6 +164,7 @@ No painel da lead no Yelp, o botão **Debug** abre e fecha o diagnóstico. **Cop
 - Dois perfis que carregam a mesma pasta e usam o mesmo ID compartilham os arquivos atualizados, mas seus dados em `chrome.storage.local` continuam separados por perfil. Se a pasta ou o ID forem diferentes, é necessário conferir a configuração do auxiliar para essa instalação.
 - O teste piloto de `0.1.34` para `0.1.35` foi concluído pelo usuário, que confirmou também a atualização no segundo perfil com mesma pasta e ID. Esse resultado valida esse cenário, sem substituir testes em configurações diferentes.
 - A versão `0.1.36` reúne as mudanças no popup e no debug do Yelp posteriores ao teste piloto.
+- A partir da `0.1.37`, a extensão se chama **Presto VA Assistant** e o auxiliar **Presto VA Assistant auto updater**. Instale primeiro a nova versão do auxiliar; o auxiliar antigo não reconhece o novo nome da extensão.
 
 Arquivos principais:
 

@@ -88,7 +88,7 @@ public static class PackageInstaller
     {
         using var json = JsonDocument.Parse(bytes);
         var root = json.RootElement;
-        if (!root.TryGetProperty("name", out var name) || name.GetString() != "Cleaning Lead Quote Assistant" ||
+        if (!root.TryGetProperty("name", out var name) || name.GetString() is not ("Cleaning Lead Quote Assistant" or "Presto VA Assistant") ||
             !root.TryGetProperty("manifest_version", out var schema) || schema.GetInt32() != 3 ||
             !root.TryGetProperty("version", out var version) || !Version.TryParse(version.GetString(), out _) ||
             (expectedVersion is not null && version.GetString() != expectedVersion))

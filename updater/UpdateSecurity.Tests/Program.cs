@@ -48,7 +48,7 @@ using (var validPackage = new MemoryStream())
         foreach (var name in expectedFiles)
         {
             using var writer = new StreamWriter(zip.CreateEntry("chrome_extension/" + name).Open());
-            writer.Write(name == "manifest.json" ? "{\"name\":\"Cleaning Lead Quote Assistant\",\"manifest_version\":3,\"version\":\"1.1\"}" : "new file");
+            writer.Write(name == "manifest.json" ? "{\"name\":\"Presto VA Assistant\",\"manifest_version\":3,\"version\":\"1.1\"}" : "new file");
         }
     }
     validPackage.Position = 0;

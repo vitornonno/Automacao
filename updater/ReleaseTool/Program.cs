@@ -75,7 +75,7 @@ public static class ReleaseBuilder
         using var doc = JsonDocument.Parse(manifestBytes);
         var manifest = doc.RootElement;
         var version = manifest.GetProperty("version").GetString();
-        if (manifest.GetProperty("name").GetString() != "Cleaning Lead Quote Assistant" || manifest.GetProperty("manifest_version").GetInt32() != 3 ||
+        if (manifest.GetProperty("name").GetString() is not ("Cleaning Lead Quote Assistant" or "Presto VA Assistant") || manifest.GetProperty("manifest_version").GetInt32() != 3 ||
             version is null || !System.Text.RegularExpressions.Regex.IsMatch(version, @"^\d+(\.\d+){1,3}$") || !Version.TryParse(version, out _))
             throw new InvalidDataException("Invalid extension manifest.");
         long total = 0;
@@ -106,7 +106,7 @@ public static class ReleaseBuilder
             }
         }
         var package = packageStream.ToArray();
-        var packageName = $"Cleaning-Lead-Quote-Assistant-v{version}.zip";
+        var packageName = $"Presto-VA-Assistant-v{version}.zip";
         var url = $"https://github.com/vitornonno/Automacao/releases/download/v{version}/{packageName}";
         var signedManifest = JsonSerializer.SerializeToUtf8Bytes(new { version, sha256 = Convert.ToHexString(SHA256.HashData(package)).ToLowerInvariant(), packageUrl = url });
         var signature = key.SignData(signedManifest, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);

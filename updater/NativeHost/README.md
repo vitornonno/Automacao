@@ -1,4 +1,4 @@
-# Auxiliar local do Chrome
+# Presto VA Assistant auto updater
 
 Este componente é um host de Native Messaging para Windows. Ele usa a chave pública `TrustedUpdateKey.pem` incorporada no executável para conferir o canal de atualizações. Uma compilação `Release` falha se a chave pública estiver ausente. O host não recebe a chave privada.
 
@@ -9,6 +9,8 @@ dotnet publish updater/NativeHost/NativeHost.csproj -c Release -r win-x64 --self
 ```
 
 Distribua `CleaningUpdaterHost.exe` junto de `Instalar-Atualizador.cmd`. O VA abre o CMD, seleciona na janela a pasta efetivamente carregada pelo Chrome e informa o ID correspondente exibido em `chrome://extensions`, confirma ambos, e reinicia o Chrome. Cancelar a seleção encerra a configuração sem alterar nada. O auxiliar é instalado em `%LOCALAPPDATA%\CleaningLeadUpdater` e registrado somente para a conta do Windows e para esse ID. Não altera políticas corporativas. Após a configuração, use o botão da extensão para verificar atualizações.
+
+O nome do executável e a pasta interna permanecem iguais para compatibilidade. Antes de atualizar para a extensão renomeada **Presto VA Assistant**, instale esta versão do auxiliar: versões antigas aceitam apenas o nome anterior e não conseguem instalar a extensão renomeada.
 
 Uma instalação descompactada pode ter um ID diferente em cada pasta. Verifique cuidadosamente que o ID e a pasta informados pertencem à mesma instalação: o Chrome não fornece o caminho da extensão ao host. A troca posterior de pasta requer uma reinstalação cuidadosamente planejada; não apague a extensão antiga enquanto os dados não forem conferidos. O setup recusa substituir uma configuração de outra instalação.
 

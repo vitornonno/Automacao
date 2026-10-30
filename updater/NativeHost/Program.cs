@@ -152,7 +152,7 @@ internal static class Program
     {
         using var document = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(directory, "manifest.json")));
         var root = document.RootElement;
-        if (root.GetProperty("name").GetString() != "Cleaning Lead Quote Assistant" || root.GetProperty("manifest_version").GetInt32() != 3)
+        if (root.GetProperty("name").GetString() is not ("Cleaning Lead Quote Assistant" or "Presto VA Assistant") || root.GetProperty("manifest_version").GetInt32() != 3)
             throw new InvalidDataException("Selected folder is not the expected extension.");
         var value = root.GetProperty("version").GetString();
         if (!Version.TryParse(value, out _)) throw new InvalidDataException("Installed extension version is invalid.");
@@ -165,6 +165,7 @@ internal static class Program
         {
             if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("Setup requires Windows.");
             _ = ReadEmbeddedPublicKey();
+            Console.WriteLine("Presto VA Assistant auto updater");
             Console.WriteLine("Selecione na janela a pasta exibida em chrome://extensions → detalhes → Carregado de.");
             var path = SelectExtensionFolder();
             if (string.IsNullOrWhiteSpace(path)) throw new InvalidOperationException("Seleção cancelada; nenhuma configuração foi alterada.");
@@ -197,7 +198,7 @@ internal static class Program
                 File.Copy(executable, installedExe, overwrite: true);
             File.WriteAllText(ConfigPath, JsonSerializer.Serialize(config, JsonOptions));
             var nativeManifest = Path.Combine(InstallDir, "native-host.json");
-            File.WriteAllText(nativeManifest, JsonSerializer.Serialize(new { name = HostName, description = "Cleaning Lead Updater", path = installedExe, type = "stdio", allowed_origins = new[] { $"chrome-extension://{id}/" } }));
+            File.WriteAllText(nativeManifest, JsonSerializer.Serialize(new { name = HostName, description = "Presto VA Assistant auto updater", path = installedExe, type = "stdio", allowed_origins = new[] { $"chrome-extension://{id}/" } }));
             using var registry = Registry.CurrentUser.CreateSubKey($@"Software\Google\Chrome\NativeMessagingHosts\{HostName}") ?? throw new IOException("Não foi possível registrar o auxiliar.");
             registry.SetValue("", nativeManifest, RegistryValueKind.String);
             Console.WriteLine("Auxiliar configurado para esta conta do Windows. Reinicie o Chrome e use Verificar atualizações na extensão.");

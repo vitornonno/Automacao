@@ -1,4 +1,4 @@
-# Cleaning Lead Quote Assistant
+# Presto VA Assistant
 
 Extensão Chrome para preparar cotações e consultar disponibilidade de leads. As mensagens são copiadas para revisão e envio manual; a extensão não envia mensagens nem altera a agenda.
 
