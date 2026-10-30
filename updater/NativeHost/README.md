@@ -18,6 +18,8 @@ Uma instalação descompactada pode ter um ID diferente em cada pasta. Verifique
 
 O canal é `https://github.com/vitornonno/Automacao/releases/download/update-channel/`; deve conter `update.json` e `update.sig`. O manifesto assinado aponta para o pacote da versão. O host valida assinatura, tamanho, URL oficial, versão e hash antes de instalar. A atualização usa somente a pasta configurada. Backups são mantidos pelo instalador de pacote; não os remova antes de confirmar que a nova versão funciona.
 
+O repositório foi renomeado para `vitornonno/Presto-VA-Assistant`. O endereço antigo do canal e o prefixo antigo dos pacotes permanecem no auxiliar e na ferramenta de publicação para manter a compatibilidade com os auxiliares já instalados; o GitHub redireciona esses downloads. Não reutilize o nome antigo do repositório nem altere esses endereços sem uma migração dos auxiliares instalados.
+
 O teste piloto de `0.1.34` para `0.1.35` foi concluído pelo usuário. O segundo perfil também reconheceu a atualização quando ambos usavam o mesmo ID e a mesma pasta. Os dados locais de cada perfil continuam independentes. Essa confirmação não cobre instalações com caminhos ou IDs diferentes.
 
 Uma nova versão só pode ser instalada depois que a chave pública, o executável, o pacote assinado e o canal estiverem preparados de forma compatível. Nunca distribua ou publique a chave privada.
