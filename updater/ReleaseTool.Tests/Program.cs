@@ -14,7 +14,7 @@ var installed = Path.Combine(root, "installed");
 var output = Path.Combine(root, "output");
 Directory.CreateDirectory(extension);
 Directory.CreateDirectory(installed);
-var names = new[] { "manifest.json", "background.js", "cleaner-availability.js", "content.js", "extractors.js", "panel.css", "popup.css", "popup.html", "popup.js", "presto-content.js", "pricing.js", "quote-messages.js", "service-picker.css", "service-picker.html", "service-picker.js", "xlsx-import.js" };
+var names = new[] { "manifest.json", "background.js", "cleaner-availability.js", "content.js", "extractors.js", "panel.css", "popup.css", "popup.html", "popup.js", "presto-content.js", "pricing.js", "quote-messages.js", "service-picker.css", "service-picker.html", "service-picker.js", "xlsx-import.js", "presto-logo.png" };
 foreach (var name in names) File.WriteAllText(Path.Combine(extension, name), name);
 File.WriteAllText(Path.Combine(extension, "manifest.json"), "{\"manifest_version\":3,\"name\":\"Cleaning Lead Quote Assistant\",\"version\":\"1.2.3\"}");
 File.WriteAllText(Path.Combine(installed, "manifest.json"), "{\"manifest_version\":3,\"name\":\"Cleaning Lead Quote Assistant\",\"version\":\"1.2.2\"}");

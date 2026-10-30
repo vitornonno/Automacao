@@ -32,7 +32,7 @@ public static class ReleaseBuilder
     private static readonly string[] Files = [
         "manifest.json", "background.js", "cleaner-availability.js", "content.js", "extractors.js",
         "panel.css", "popup.css", "popup.html", "popup.js", "presto-content.js", "pricing.js",
-        "quote-messages.js", "service-picker.css", "service-picker.html", "service-picker.js", "xlsx-import.js"
+        "quote-messages.js", "service-picker.css", "service-picker.html", "service-picker.js", "xlsx-import.js", "presto-logo.png"
     ];
 
     public static void CreateKey(string privatePath, string publicPath)

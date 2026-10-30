@@ -3,6 +3,7 @@
   "name": "Presto VA Assistant",
   "version": "0.1.37",
   "description": "Calculates internal preliminary cleaning quotes for Yelp and Thumbtack leads.",
+  "icons": { "128": "presto-logo.png" },
   "permissions": ["storage", "activeTab", "clipboardWrite", "nativeMessaging"],
   "host_permissions": ["https://*.yelp.com/*", "https://*.yelp.com.br/*", "https://*.thumbtack.com/*", "https://app.bepresto.com/*", "https://*.workers.dev/*"],
   "background": {
@@ -11,6 +12,7 @@
   },
   "action": {
     "default_title": "Presto VA Assistant",
+    "default_icon": { "128": "presto-logo.png" },
     "default_popup": "popup.html"
   },
   "content_scripts": [

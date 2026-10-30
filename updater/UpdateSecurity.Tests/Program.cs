@@ -40,7 +40,7 @@ using (var invalidPackage = new MemoryStream())
     catch (InvalidDataException) { }
     if (File.ReadAllText(Path.Combine(target, "user-data.txt")) != "preserve") throw new Exception("User data changed.");
 }
-var expectedFiles = new[] { "manifest.json", "background.js", "cleaner-availability.js", "content.js", "extractors.js", "panel.css", "popup.css", "popup.html", "popup.js", "presto-content.js", "pricing.js", "quote-messages.js", "service-picker.css", "service-picker.html", "service-picker.js", "xlsx-import.js" };
+var expectedFiles = new[] { "manifest.json", "background.js", "cleaner-availability.js", "content.js", "extractors.js", "panel.css", "popup.css", "popup.html", "popup.js", "presto-content.js", "pricing.js", "quote-messages.js", "service-picker.css", "service-picker.html", "service-picker.js", "xlsx-import.js", "presto-logo.png" };
 using (var validPackage = new MemoryStream())
 {
     using (var zip = new ZipArchive(validPackage, ZipArchiveMode.Create, true))

@@ -9,7 +9,7 @@ internal static class TestHarness
     private static readonly string[] Files = {
         "manifest.json", "background.js", "cleaner-availability.js", "content.js", "extractors.js", "panel.css",
         "popup.css", "popup.html", "popup.js", "presto-content.js", "pricing.js", "quote-messages.js",
-        "service-picker.css", "service-picker.html", "service-picker.js", "xlsx-import.js"
+        "service-picker.css", "service-picker.html", "service-picker.js", "xlsx-import.js", "presto-logo.png"
     };
     private const string PackageUrl = "https://github.com/vitornonno/Automacao/releases/download/v2.0/extension.zip";
 

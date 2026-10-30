@@ -1,5 +1,7 @@
 # Presto VA Assistant
 
+<img src="chrome-extension/presto-logo.png" alt="Logo Presto VA Assistant" width="128">
+
 Uma extensão local do Chrome para ajudar equipes de limpeza a revisar leads do Yelp, montar cotações preliminares e sugerir disponibilidade antes da resposta manual ao cliente.
 
 ## Downloads e instalação no Windows
