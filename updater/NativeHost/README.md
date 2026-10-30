@@ -12,7 +12,7 @@ Distribua `CleaningUpdaterHost.exe` junto de `Instalar-Atualizador.cmd`. O VA ab
 
 O nome do executável e a pasta interna permanecem iguais para compatibilidade. Antes de atualizar para a extensão renomeada **Presto VA Assistant**, instale esta versão do auxiliar: versões antigas aceitam apenas o nome anterior e não conseguem instalar a extensão renomeada.
 
-A extensão v0.1.38 inclui um arquivo de logo novo. Instale o auxiliar v0.1.38 antes dela, inclusive se já usa o auxiliar v0.1.37, que não aceita esse arquivo no pacote. Durante a migração o canal automático permanece na v0.1.36.
+A extensão a partir da v0.1.38 inclui um arquivo de logo novo. Instale o auxiliar v0.1.38 antes de atualizar, inclusive se já usa o auxiliar v0.1.37, que não aceita esse arquivo no pacote. O canal automático oferece a v0.1.40.
 
 Uma instalação descompactada pode ter um ID diferente em cada pasta. Verifique cuidadosamente que o ID e a pasta informados pertencem à mesma instalação: o Chrome não fornece o caminho da extensão ao host. A troca posterior de pasta requer uma reinstalação cuidadosamente planejada; não apague a extensão antiga enquanto os dados não forem conferidos. O setup recusa substituir uma configuração de outra instalação.
 

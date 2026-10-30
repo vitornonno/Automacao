@@ -156,10 +156,12 @@ function calendarNavigationButton(direction) {
 
 function displayedCalendarMonth() {
   const label = text(document.querySelector('.services-calendar-container .main-app-bar span[role="button"].text-capitalize'));
-  const match = label.match(/\b([A-Za-z]+)\s+(\d{4})\b/);
+  const normalized = label.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const match = normalized.match(/\b([a-z]+)\.?\s+(\d{4})\b/);
   if (!match) return null;
-  const month = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'].indexOf(match[1].slice(0, 3).toLowerCase());
-  return month < 0 ? null : `${match[2]}-${String(month + 1).padStart(2, '0')}`;
+  const months = { jan: 1, feb: 2, fev: 2, mar: 3, apr: 4, abr: 4, may: 5, mai: 5, jun: 6, jul: 7, aug: 8, ago: 8, sep: 9, set: 9, oct: 10, out: 10, nov: 11, dec: 12, dez: 12 };
+  const month = months[match[1].slice(0, 3)];
+  return month ? `${match[2]}-${String(month).padStart(2, '0')}` : null;
 }
 
 function mergeById(records) {
