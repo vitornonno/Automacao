@@ -10,8 +10,6 @@ const prestoStatusElement = document.querySelector('#presto-status');
 const prestoDebugOutput = document.querySelector('#presto-debug-output');
 let prestoDebug = null;
 let selectedFilter = 'all';
-const activeLeadServiceElement = document.querySelector('#active-lead-service');
-const activeLeadServiceStatusElement = document.querySelector('#active-lead-service-status');
 const checkUpdateButton = document.querySelector('#check-update');
 const updateStatusElement = document.querySelector('#update-status');
 const UPDATE_STATE_KEY = 'extensionUpdateStatus';
@@ -47,7 +45,8 @@ function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]);
 }
 function date(value) {
-  return value ? new Intl.DateTimeFormat(undefined, { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value)) : 'Unknown date';
+  const parsed = new Date(value);
+  return value && Number.isFinite(parsed.getTime()) ? new Intl.DateTimeFormat(undefined, { dateStyle: 'short', timeStyle: 'short' }).format(parsed) : 'Unknown date';
 }
 function stateLabel(state) {
   return ({ pending_human_approval: 'Pending approval', approved: 'Approved', adjusted: 'Adjusted', discarded: 'Discarded' })[state] || state;
@@ -91,9 +90,9 @@ async function loadLastPrestoScan() {
   prestoStatus(latest, true);
 }
 function result(review) {
-  const quote = review.quote;
+  const quote = review.quote || {};
   if (quote.quoteType === 'time_only' && quote.estimatedHours) return `${quote.estimatedHours.minimum}–${quote.estimatedHours.maximum} hours`;
-  if (quote.quoteType === 'fixed_price' && quote.amount) return `$${quote.priceRange?.minimum ?? quote.amount}–$${quote.priceRange?.maximum ?? quote.amount}`;
+  if (quote.quoteType === 'fixed_price' && Number.isFinite(quote.amount)) return `$${quote.priceRange?.minimum ?? quote.amount}–$${quote.priceRange?.maximum ?? quote.amount}`;
   return 'Manual review required';
 }
 function card(review) {
@@ -101,13 +100,14 @@ function card(review) {
   const quote = review.quote || {};
   const href = review.url || lead.url;
   return `<article class="review" data-id="${escapeHtml(review.id)}">
-    <div class="card-header"><strong>${escapeHtml(lead.customerName || 'Client name unavailable')}</strong><span class="state ${review.state}">${stateLabel(review.state)}</span></div>
+    <div class="card-header"><strong>${escapeHtml(lead.customerName || 'Client name unavailable')}</strong><span class="state ${escapeHtml(review.state || '')}">${escapeHtml(stateLabel(review.state) || 'Incomplete')}</span></div>
     <p class="company">${CleaningQuoteEngine.COMPANIES[quote.company]?.name || 'Unknown company'}</p>
     <p class="service">${escapeHtml(quote.serviceLabel || 'Service needs review')}</p>
     <p class="result">${result(review)}</p>
     <dl><div><dt>Source</dt><dd>${escapeHtml(lead.platform || 'Unknown')}</dd></div><div><dt>Size band</dt><dd>${quote.size?.band ? `Up to ${quote.size.band} sq. ft.` : 'Not resolved'}</dd></div><div><dt>Saved</dt><dd>${escapeHtml(date(review.savedAt))}</dd></div></dl>
     <div class="actions">
       ${href ? `<a href="${escapeHtml(href)}" target="_blank" rel="noreferrer">Open lead</a>` : ''}
+      <button class="quiet" data-copy-lead="true">Copy message</button>
       ${review.state === 'pending_human_approval' ? '<button data-state="approved">Approve</button><button data-state="adjusted">Mark adjusted</button><button class="quiet" data-state="discarded">Discard</button>' : ''}
       <button class="quiet" data-remove-lead="true">Remove</button>
     </div>
@@ -115,11 +115,11 @@ function card(review) {
 }
 async function loadReviews() {
   const records = await chrome.storage.local.get(null);
-  const reviews = Object.entries(records).filter(([key]) => key.startsWith('lead:')).map(([, value]) => value)
+  const reviews = Object.entries(records).filter(([key, value]) => key.startsWith('lead:') && value && typeof value === 'object' && typeof value.id === 'string').map(([, value]) => value)
     .sort((a, b) => new Date(b.updatedAt || b.savedAt) - new Date(a.updatedAt || a.savedAt));
   const visible = selectedFilter === 'all' ? reviews : reviews.filter((review) => review.state === selectedFilter);
   summaryElement.textContent = selectedFilter === 'all' ? `${reviews.length} saved lead${reviews.length === 1 ? '' : 's'}` : `${visible.length} pending approval`;
-  reviewsElement.innerHTML = visible.length ? visible.map(card).join('') : '<p class="empty">No leads in this queue.</p>';
+  reviewsElement.innerHTML = visible.length ? visible.map(card).join('') : '<p class="empty">No saved quotes in this view.</p>';
 }
 reviewsElement.addEventListener('click', async (event) => {
   const state = event.target.dataset.state;
@@ -139,10 +139,10 @@ reviewsElement.addEventListener('click', async (event) => {
     }
     return;
   }
-  if (!state && reviewCard && !event.target.closest('button, a')) {
+  if (event.target.dataset.copyLead && reviewCard) {
     const records = await chrome.storage.local.get(`lead:${reviewCard.dataset.id}`);
     const review = records[`lead:${reviewCard.dataset.id}`];
-    if (!review) return;
+    if (!review?.lead || !review?.quote) { summaryElement.textContent = 'This saved quote is incomplete and cannot be copied.'; return; }
     try {
       await navigator.clipboard.writeText(CleaningQuoteMessages.approvedMessage(review));
       summaryElement.textContent = 'Message copied to clipboard.';
@@ -155,33 +155,16 @@ reviewsElement.addEventListener('click', async (event) => {
   const id = event.target.closest('[data-id]')?.dataset.id;
   if (!id) return;
   event.target.disabled = true;
-  const response = await chrome.runtime.sendMessage({ type: 'UPDATE_REVIEW_STATE', id, state });
-  if (!response?.ok) event.target.disabled = false;
-  await loadReviews();
-});
-document.querySelector('#refresh').addEventListener('click', loadReviews);
-activeLeadServiceElement.addEventListener('change', async () => {
-  const serviceId = activeLeadServiceElement.value;
-  if (!serviceId) return;
-  activeLeadServiceElement.disabled = true;
-  activeLeadServiceStatusElement.textContent = 'Applying to the active Yelp lead…';
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab?.id || !/^https:\/\/biz\.yelp\.com(?:\.br)?\/leads_center\//.test(tab.url || '')) throw new Error('Open the target Yelp lead tab first.');
-    const leadId = tab.url.match(/\/leads\/([^/?#]+)/)?.[1];
-    if (!leadId) throw new Error('Could not identify the current Yelp lead.');
-    await chrome.storage.local.set({ [`manualServiceOverride:yelp:${leadId}`]: { serviceId, updatedAt: Date.now() } });
-    // Message the current content script immediately. The saved value remains
-    // as a reliable fallback while Yelp is re-rendering the lead page.
-    const response = await chrome.tabs.sendMessage(tab.id, { type: 'SET_ACTIVE_LEAD_SERVICE', serviceId });
-    if (!response?.ok) throw new Error(response?.error || 'The lead could not accept the selected cleaning type.');
-    activeLeadServiceStatusElement.textContent = `${serviceId === 'move_in' ? 'Move-in' : 'Move-out'} applied to the active lead.`;
+    const response = await chrome.runtime.sendMessage({ type: 'UPDATE_REVIEW_STATE', id, state });
+    if (!response?.ok) throw new Error(response?.error || 'Could not update the saved quote.');
+    await loadReviews();
   } catch (error) {
-    activeLeadServiceStatusElement.textContent = error.message || 'Could not apply the service type.';
-  } finally {
-    activeLeadServiceElement.disabled = false;
+    summaryElement.textContent = error.message || 'Could not update the saved quote.';
+    event.target.disabled = false;
   }
 });
+document.querySelector('#refresh').addEventListener('click', loadReviews);
 document.querySelectorAll('.filter').forEach((button) => button.addEventListener('click', () => {
   selectedFilter = button.dataset.filter;
   document.querySelectorAll('.filter').forEach((item) => item.classList.toggle('active', item === button));
@@ -223,9 +206,14 @@ document.querySelector('#copy-relay-token').addEventListener('click', async () =
 document.querySelector('#test-relay').addEventListener('click', async (event) => {
   event.target.disabled = true;
   relayStatusElement.textContent = 'Testing…';
-  const response = await chrome.runtime.sendMessage({ type: 'TEST_ROUTE_RELAY' });
-  relayStatusElement.textContent = response?.ok ? 'Connection confirmed.' : response?.error || 'Connection failed.';
-  event.target.disabled = false;
+  try {
+    const response = await chrome.runtime.sendMessage({ type: 'TEST_ROUTE_RELAY' });
+    relayStatusElement.textContent = response?.ok ? 'Connection confirmed.' : response?.error || 'Connection failed.';
+  } catch {
+    relayStatusElement.textContent = 'Connection failed.';
+  } finally {
+    event.target.disabled = false;
+  }
 });
 document.querySelector('#scan-presto').addEventListener('click', async (event) => {
   event.target.disabled = true;

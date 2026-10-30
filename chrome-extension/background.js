@@ -1,6 +1,14 @@
 const UPDATE_HOST = 'com.prestova.cleaning_updater';
 const UPDATE_STATE_KEY = 'extensionUpdateStatus';
+const UPDATE_DEBUG_KEY = 'extensionUpdateDebug';
 let updateInProgress = false;
+let updateDebug = null;
+
+async function updateDebugEvent(step, details = {}) {
+  if (!updateDebug) return;
+  updateDebug.events.push({ at: new Date().toISOString(), elapsedMs: Date.now() - updateDebug.startMs, step, ...details });
+  await chrome.storage.local.set({ [UPDATE_DEBUG_KEY]: updateDebug });
+}
 
 function nativeUpdateRequest(action) {
   return new Promise((resolve, reject) => {
@@ -37,30 +45,60 @@ async function notifyOpenLeadPages() {
   await Promise.allSettled(tabs.filter((tab) => Number.isInteger(tab.id)).map((tab) => chrome.tabs.sendMessage(tab.id, { type: 'SHOW_UPDATE_RELOAD_NOTICE' }, { frameId: 0 })));
 }
 
+function compareUpdateVersions(left, right) {
+  if (!/^\d+(?:\.\d+){0,3}$/.test(left || '') || !/^\d+(?:\.\d+){0,3}$/.test(right || '')) return null;
+  const a = left.split('.').map(Number); const b = right.split('.').map(Number);
+  for (let i = 0; i < 4; i += 1) {
+    const difference = (a[i] || 0) - (b[i] || 0);
+    if (difference) return Math.sign(difference);
+  }
+  return 0;
+}
+
+async function finishUpdateForProfile(version) {
+  await setUpdateStatus('installed', 'Atualização disponível neste perfil. Atualize a página do Yelp após o recarregamento da extensão.', version);
+  await updateDebugEvent('profile_reload_requested', { version });
+  try { await notifyOpenLeadPages(); } catch { /* O aviso persistirá no popup. */ }
+  await new Promise((resolve) => setTimeout(resolve, 1500));
+  chrome.runtime.reload();
+}
+
+async function handleCurrentDiskVersion(version) {
+  const comparison = compareUpdateVersions(version, chrome.runtime.getManifest().version);
+  if (comparison === null || comparison < 0) throw new Error('A versão da pasta não corresponde à extensão deste perfil. Confira a configuração do auxiliar.');
+  if (comparison > 0) { await finishUpdateForProfile(version); return; }
+  await setUpdateStatus('up_to_date', 'A extensão está atualizada.', version);
+}
+
 async function checkAndInstallUpdate() {
+  updateDebug = { startedAt: new Date().toISOString(), startMs: Date.now(), extensionVersion: chrome.runtime.getManifest().version, events: [] };
+  await updateDebugEvent('check_started');
   await setUpdateStatus('checking', 'Verificando atualizações…');
   try {
+    let started = Date.now();
+    await updateDebugEvent('native_check_started');
     const check = await nativeUpdateRequest('check');
+    await updateDebugEvent('native_check_finished', { durationMs: Date.now() - started, status: check?.status || null, hostSteps: check?.steps || null });
     if (!check?.ok) throw new Error(check?.message || 'Não foi possível verificar atualizações.');
     if (check.status === 'up_to_date') {
-      await setUpdateStatus('up_to_date', 'A extensão está atualizada.', check.currentVersion || null);
+      await handleCurrentDiskVersion(check.currentVersion);
       return;
     }
     if (check.status !== 'available') throw new Error('O auxiliar retornou uma resposta inesperada.');
     await setUpdateStatus('installing', 'Atualização encontrada. Instalando…', check.availableVersion || null);
+    started = Date.now();
+    await updateDebugEvent('native_install_started', { version: check.availableVersion || null });
     const installed = await nativeUpdateRequest('install');
+    await updateDebugEvent('native_install_finished', { durationMs: Date.now() - started, status: installed?.status || null, hostSteps: installed?.steps || null });
     if (!installed?.ok) throw new Error(installed?.message || 'Não foi possível instalar a atualização.');
     if (installed.status === 'up_to_date') {
-      await setUpdateStatus('up_to_date', 'A extensão está atualizada.', installed.currentVersion || null);
+      await handleCurrentDiskVersion(installed.currentVersion);
       return;
     }
     if (installed.status !== 'installed') throw new Error('O auxiliar não confirmou a instalação.');
-    await setUpdateStatus('installed', 'Atualização instalada. Atualize a página do Yelp para usar a nova versão.', installed.availableVersion || null);
-    // A barra permanece na página mesmo após o recarregamento da extensão.
-    try { await notifyOpenLeadPages(); } catch { /* O aviso persistirá no popup. */ }
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    chrome.runtime.reload();
+    await finishUpdateForProfile(installed.availableVersion || null);
   } catch (error) {
+    await updateDebugEvent('failed', { message: error?.message || 'Não foi possível verificar atualizações.' });
     await setUpdateStatus('error', error?.message || 'Não foi possível verificar atualizações.');
   }
 }

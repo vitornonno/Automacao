@@ -16,6 +16,7 @@ function fakeBackground(replies) {
     },
     runtime: {
       id: 'test-extension',
+      getManifest: () => ({ version: '1.0' }),
       getURL: (path) => `chrome-extension://test-extension/${path}`,
       onMessage: { addListener(listener) { listeners.push(listener); } },
       reload() { reloaded = true; },
@@ -50,7 +51,14 @@ function fakeBackground(replies) {
   await fake.request();
   assert.deepEqual(fake.actions, ['check']);
   assert.equal(fake.saved.extensionUpdateStatus.stage, 'up_to_date');
+  assert.ok(fake.saved.extensionUpdateDebug.events.some((event) => event.step === 'native_check_finished' && typeof event.durationMs === 'number'));
   assert.equal(fake.wasReloaded(), false);
+
+  fake = fakeBackground([{ ok: true, status: 'up_to_date', currentVersion: '1.1' }]);
+  await fake.request();
+  assert.equal(fake.saved.extensionUpdateStatus.stage, 'installed');
+  assert.equal(fake.wasReloaded(), true, 'An older profile must reload when another profile has already updated the shared folder');
+  assert.equal(fake.notices[0].message.type, 'SHOW_UPDATE_RELOAD_NOTICE');
 
   fake = fakeBackground([
     { ok: true, status: 'available', availableVersion: '1.1' },
@@ -60,12 +68,14 @@ function fakeBackground(replies) {
   assert.deepEqual(fake.actions, ['check', 'install']);
   assert.equal(fake.saved.extensionUpdateStatus.stage, 'installed');
   assert.equal(fake.saved.extensionUpdateStatus.version, '1.1');
+  assert.ok(fake.saved.extensionUpdateDebug.events.some((event) => event.step === 'native_install_finished'));
   assert.equal(fake.notices[0].message.type, 'SHOW_UPDATE_RELOAD_NOTICE');
   assert.equal(fake.wasReloaded(), true);
 
   fake = fakeBackground([{ ok: false, status: 'error', message: 'assinatura inválida' }]);
   await fake.request();
   assert.equal(fake.saved.extensionUpdateStatus.stage, 'error');
+  assert.ok(fake.saved.extensionUpdateDebug.events.some((event) => event.step === 'failed'));
   assert.equal(fake.wasReloaded(), false);
   assert.deepEqual(fake.actions, ['check']);
 

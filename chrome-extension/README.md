@@ -11,15 +11,16 @@ A especificação operacional mantida está em [docs/EXTENSION-SPEC.md](../docs/
 3. Após mudanças no projeto, recarregue a extensão e atualize a página do Yelp.
 4. Revise a empresa, o tipo de limpeza e a cotação no painel; copie a mensagem e envie-a manualmente.
 
-No popup, **Manual quote** permite inserir os dados para outros canais. A agenda do Presto é lida mediante ação do atendente, e o relay de rotas precisa estar configurado para buscas com deslocamento.
+No popup, **Manual quote** permite inserir os dados para outros canais. **Saved quotes** mostra o histórico local do perfil; seus estados não enviam mensagens nem alteram o Yelp. A agenda do Presto é lida mediante ação do atendente, e o relay de rotas precisa estar configurado para buscas com deslocamento. No Yelp, **Debug** abre o diagnóstico e **Copy debug** copia seus dados para análise.
+
+Para instalações configuradas com o auxiliar Windows, use **Verificar atualizações** no popup e atualize a página após a instalação. Consulte [as instruções do auxiliar](../updater/NativeHost/README.md).
 
 ## Verificação local
 
 Execute nesta pasta:
 
 ```powershell
-node test-pricing.js
-node test-cleaner-availability.js
+npm test
 node --check content.js
 node --check extractors.js
 node --check quote-messages.js

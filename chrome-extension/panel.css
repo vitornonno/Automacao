@@ -67,5 +67,5 @@
 #cleaning-quote-assistant .queue-actions .quiet { border-color: #bdc8d7; color: #566477; background: #fff; } #cleaning-quote-assistant .queue-empty { color: #566477; text-align: center; }
 #cleaning-quote-assistant .debug { padding: 10px 14px; border-top: 1px solid #e4e9f0; background: #111827; color: #d9e1ec; }
 #cleaning-quote-assistant .debug summary { cursor: pointer; font-weight: 700; } #cleaning-quote-assistant .debug pre { max-height: 260px; margin: 8px 0 0; overflow: auto; white-space: pre-wrap; font: 11px/1.35 Consolas, monospace; }
-#cleaning-quote-assistant .debug summary button { margin-left: 8px; padding: 3px 6px; border: 1px solid #93a4be; border-radius: 4px; color: #d9e1ec; background: #253247; cursor: pointer; font: 11px Arial, sans-serif; }
+#cleaning-quote-assistant .debug button { margin-top: 8px; padding: 3px 6px; border: 1px solid #93a4be; border-radius: 4px; color: #d9e1ec; background: #253247; cursor: pointer; font: 11px Arial, sans-serif; }
 #cleaning-quote-assistant .debug small { display: block; margin-top: 8px; color: #a7f3d0; }

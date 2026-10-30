@@ -86,8 +86,8 @@ internal static class TestHarness
         {
             var url = request.RequestUri?.AbsoluteUri;
             byte[] content;
-            if (url?.EndsWith("/update.json", StringComparison.Ordinal) == true) content = metadata;
-            else if (url?.EndsWith("/update.sig", StringComparison.Ordinal) == true) content = Signature;
+            if (request.RequestUri?.AbsolutePath.EndsWith("/update.json", StringComparison.Ordinal) == true) content = metadata;
+            else if (request.RequestUri?.AbsolutePath.EndsWith("/update.sig", StringComparison.Ordinal) == true) content = Signature;
             else if (url == PackageUrl) { PackageReads++; content = Package; }
             else return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(content) });

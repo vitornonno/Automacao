@@ -3,12 +3,12 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Approval queue</title>
+    <title>Cleaning Lead Assistant</title>
     <link rel="stylesheet" href="popup.css">
   </head>
   <body>
     <main>
-      <header><h1>Approval queue</h1><div class="queue-tools"><button id="manual-quote-toggle" class="quiet" type="button">Manual quote</button><button id="refresh" title="Refresh">↻</button></div></header>
+      <header><h1>Cleaning Lead Assistant</h1><div class="queue-tools"><button id="manual-quote-toggle" class="quiet" type="button">Manual quote</button><button id="refresh" title="Refresh saved quotes" aria-label="Refresh saved quotes">↻</button></div></header>
       <section class="update-settings">
         <button id="check-update" type="button">Verificar atualizações</button>
         <small id="update-status" role="status" aria-live="polite"></small>
@@ -32,12 +32,8 @@
         <div class="manual-actions"><button id="manual-find-availability" type="button">Find availability</button><button id="manual-copy-message" class="quiet" type="button">Copy quote message</button></div>
         <section id="manual-availability" aria-live="polite"></section>
       </section>
-      <section class="active-lead-service">
-        <strong>Active Yelp lead</strong>
-        <small>For a Move-in / Move-out lead, choose the type to apply to the current Yelp tab.</small>
-        <select id="active-lead-service"><option value="">Move-in / Move-out type</option><option value="move_in">Move-in Cleaning</option><option value="move_out">Move-out Cleaning</option></select>
-        <small id="active-lead-service-status" aria-live="polite"></small>
-      </section>
+      <h2 class="saved-quotes-title">Saved quotes</h2>
+      <p class="saved-quotes-note">Saved in this Chrome profile. Status changes do not send messages or update Yelp.</p>
       <nav aria-label="Review filters">
         <button class="filter" data-filter="pending_human_approval">Pending</button>
         <button class="filter active" data-filter="all">All</button>

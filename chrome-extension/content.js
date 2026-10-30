@@ -2,7 +2,7 @@
 (function contentModule() {
   'use strict';
 
-  const BUILD_VERSION = '0.1.28';
+  const BUILD_VERSION = '0.1.36';
   let companyOverride = null;
   let discountPercent = '';
   let lead = null;
@@ -13,8 +13,8 @@
   let queueFeedback = '';
   let activeRoute = null;
   let queuedRoute = null;
-  let debugMode = false;
   let debugEvents = [];
+  let debugVisible = false;
   let debugCopyFeedback = '';
   let missingServiceRetry = null;
   let existingReview = null;
@@ -77,9 +77,8 @@
     };
   }
   function debugMarkup() {
-    // Native <details> does not depend on Yelp's event delegation, so debug
-    // remains inspectable even when a page swallows button click events.
-    return `<details class="debug"><summary>Verbose debug — click to expand</summary>${debugCopyFeedback ? `<small>${escapeHtml(debugCopyFeedback)}</small>` : ''}<pre>${escapeHtml(JSON.stringify(captureSnapshot(lead, quote), null, 2))}</pre></details>`;
+    if (!debugVisible) return '';
+    return `<section class="debug"><strong>Verbose debug</strong><br><button type="button" data-action="copy-debug">Copy debug</button><small role="status" aria-live="polite">${escapeHtml(debugCopyFeedback)}</small><pre>${escapeHtml(JSON.stringify(captureSnapshot(lead, quote), null, 2))}</pre></section>`;
   }
 
   const root = document.createElement('aside');
@@ -102,16 +101,6 @@
     root.style.right = 'auto';
     event.preventDefault();
   });
-  // Use pointer capture for the header controls as well. It is more reliable
-  // than a bubbling click on Yelp's SPA, and fires before the page can stop a
-  // click event originating from our panel.
-  root.addEventListener('pointerdown', (event) => {
-    const action = event.target.closest?.('[data-action]')?.dataset.action;
-    if (action !== 'debug') return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    toggleDebug();
-  }, true);
   window.addEventListener('pointermove', (event) => {
     if (!panelDrag) return;
     const maxLeft = Math.max(0, window.innerWidth - root.offsetWidth);
@@ -517,7 +506,7 @@
       ? `<button data-action="copy-details-request" ${requestedDetails.size ? '' : 'disabled'}>Copy selected details request</button>`
       : '<button data-action="open-details-request">Request details</button>';
     root.innerHTML = `
-        <header><span>Lead estimate <small>v${BUILD_VERSION}</small></span><div><small>Debug below</small><button data-action="close" aria-label="Close">×</button></div></header>
+        <header><span>Lead estimate <small>v${BUILD_VERSION}</small></span><div><button type="button" data-action="debug" aria-expanded="${debugVisible}">Debug</button><button data-action="close" aria-label="Close">×</button></div></header>
       <section class="lead-fields">
         ${input('Company name', lead.companyName, 'companyName')}
         ${input('Customer name', lead.customerName, 'customerName')}
@@ -549,7 +538,7 @@
         ? `<div class="queue-actions"><button data-review-state="approved">Approve</button><button data-review-state="adjusted">Adjust</button><button class="quiet" data-review-state="discarded">Discard</button></div>` : '';
       return `<article class="queue-card" data-review-id="${escapeHtml(review.id)}"><div><strong>${escapeHtml(customerName)}</strong><span>${escapeHtml(review.state || 'pending_human_approval').replaceAll('_', ' ')}</span></div><p class="queue-company">${company}</p><p>${escapeHtml(itemQuote.serviceLabel || 'Service needs review')}</p><b>${result}</b>${actions}</article>`;
     }).join('') : '<p class="queue-empty">No saved leads yet.</p>';
-    root.innerHTML = `<header><span>Approval queue</span><div><small>Debug below</small><button data-action="back" aria-label="Back">‹</button><button data-action="close" aria-label="Close">×</button></div></header><section class="queue-list">${queueFeedback ? `<p class="queue-feedback">${escapeHtml(queueFeedback)}</p>` : ''}${cards}</section>${debugMarkup()}`;
+    root.innerHTML = `<header><span>Approval queue</span><div><button type="button" data-action="debug" aria-expanded="${debugVisible}">Debug</button><button data-action="back" aria-label="Back">‹</button><button data-action="close" aria-label="Close">×</button></div></header><section class="queue-list">${queueFeedback ? `<p class="queue-feedback">${escapeHtml(queueFeedback)}</p>` : ''}${cards}</section>${debugMarkup()}`;
   }
   async function updateReviewState(id, state) {
     const key = `lead:${id}`;
@@ -621,11 +610,6 @@
     // only surface input. Handle either one, while applying it once.
     selector.addEventListener('input', applySelection);
     selector.addEventListener('change', applySelection);
-  }
-  function toggleDebug() {
-    debugMode = !debugMode;
-    logDebug('Debug mode toggled', { enabled: debugMode });
-    queueMode ? renderQueue() : render();
   }
   function bindPanelControls() {
     bindManualServiceControl();
@@ -736,7 +720,11 @@
   root.addEventListener('click', async (event) => {
     const action = event.target.closest?.('[data-action]')?.dataset.action;
     if (action === 'close') root.remove();
-    if (action === 'debug') toggleDebug();
+    if (action === 'debug') {
+      debugVisible = !debugVisible;
+      logDebug('Debug toggled', { enabled: debugVisible });
+      queueMode ? renderQueue() : render();
+    }
     if (action === 'copy-debug') {
       try {
         await navigator.clipboard.writeText(JSON.stringify(captureSnapshot(lead, quote), null, 2));
@@ -745,7 +733,8 @@
       } catch {
         debugCopyFeedback = 'Could not copy debug.';
       }
-      queueMode ? renderQueue() : render();
+      const status = root.querySelector('.debug [role="status"]');
+      if (status) status.textContent = debugCopyFeedback;
     }
     if (action === 'queue') { queueMode = true; render(); }
     if (action === 'back') { queueMode = false; render(); }
@@ -755,6 +744,7 @@
         const reviewToCopy = {
           ...existingReview,
           id: existingReview?.id || lead.id,
+          url: location.href,
           lead: { ...lead },
           quote,
           state: existingReview?.state || 'pending_human_approval',
@@ -768,7 +758,7 @@
         await navigator.clipboard.writeText(CleaningQuoteMessages.approvedMessage(reviewToCopy));
         await chrome.storage.local.set({ [reviewKey(lead.id)]: reviewToCopy });
         existingReview = reviewToCopy;
-        confirmationFeedback = 'Quote message copied to clipboard and saved to the queue.';
+        confirmationFeedback = 'Quote message copied to clipboard and saved in this profile.';
       } catch {
         confirmationFeedback = 'Could not copy the approved message.';
       }

@@ -112,7 +112,7 @@ Ao reabrir uma lead salva/aprovada/ajustada, não criar uma duplicata. O botão 
 Todos os dados operacionais ficam no perfil local do Chrome, em `chrome.storage.local`:
 
 - Cada cotação confirmada é armazenada pela chave única `lead:<id-da-lead-do-yelp>`.
-- No popup da extensão, **Remove** permite remover individualmente uma lead da fila local, após confirmação. Não remove dados externos.
+- No popup da extensão, **Saved quotes** mostra as cotações salvas no perfil atual do Chrome. O histórico é usado também pelo painel do Yelp; seus estados são locais e não enviam mensagens nem alteram o Yelp. **Copy message** copia a mensagem salva e **Remove** remove individualmente uma cotação local, após confirmação, sem remover dados externos. O tipo Move-in/Move-out é escolhido no painel da própria página do Yelp.
 - A agenda lida do Presto é armazenada por empresa em `prestoJobs:kacs` e `prestoJobs:jheys`.
 - Uma nova leitura do Presto substitui o snapshot anterior daquela empresa.
 - Esses dados não são gravados em arquivos do projeto, no Presto, no CRM ou no Cloudflare.
@@ -155,7 +155,15 @@ O Presto será a fonte de verdade para agenda. KACS e Jhey's usam agendas indepe
 
 ## Debug e manutenção
 
-No painel da lead, **Verbose debug** expande o JSON com versão, rota, origem da captura, campos extraídos, cotação, registro existente e eventos recentes. Evite compartilhar dados pessoais além do necessário para diagnóstico.
+No painel da lead no Yelp, o botão **Debug** abre e fecha o diagnóstico. **Copy debug** copia o JSON com versão, rota, origem da captura, campos extraídos, cotação, registro existente e eventos recentes. Evite compartilhar dados pessoais além do necessário para diagnóstico. O debug da atualização foi retirado do popup; o controle **Verificar atualizações** continua disponível.
+
+## Atualização da extensão no Windows
+
+- Os VAs usam Chrome em computadores pessoais e carregam a extensão descompactada. O auxiliar local de Native Messaging é instalado uma vez por conta do Windows, com o ID da extensão e a pasta efetivamente carregada pelo Chrome. O instalador permite escolher essa pasta em uma janela; os caminhos podem variar entre VAs.
+- Pelo popup, **Verificar atualizações** consulta o canal assinado. Quando há versão nova, o auxiliar valida o pacote, cria backup e atualiza a pasta configurada; a página do Yelp deve ser atualizada após a instalação. O canal e as instruções de instalação e publicação estão em `updater/NativeHost/README.md`.
+- Dois perfis que carregam a mesma pasta e usam o mesmo ID compartilham os arquivos atualizados, mas seus dados em `chrome.storage.local` continuam separados por perfil. Se a pasta ou o ID forem diferentes, é necessário conferir a configuração do auxiliar para essa instalação.
+- O teste piloto de `0.1.34` para `0.1.35` foi concluído pelo usuário, que confirmou também a atualização no segundo perfil com mesma pasta e ID. Esse resultado valida esse cenário, sem substituir testes em configurações diferentes.
+- A versão `0.1.36` reúne as mudanças no popup e no debug do Yelp posteriores ao teste piloto.
 
 Arquivos principais:
 

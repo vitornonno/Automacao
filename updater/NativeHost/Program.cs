@@ -5,10 +5,12 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using CleaningUpdater;
 using Microsoft.Win32;
+using System.Diagnostics;
 
 internal sealed record HostConfiguration(string ExtensionId, string ExtensionPath);
 internal sealed record HostRequest(string? Action);
-internal sealed record HostResponse(bool Ok, string Status, string? CurrentVersion, string? AvailableVersion, string Message);
+internal sealed record HostStep(string Step, long DurationMs, bool Ok);
+internal sealed record HostResponse(bool Ok, string Status, string? CurrentVersion, string? AvailableVersion, string Message, List<HostStep>? Steps = null);
 
 internal static class Program
 {
@@ -24,6 +26,7 @@ internal static class Program
     {
         if (args.Length == 1 && args[0] == "--setup") return Setup();
         var output = Console.OpenStandardOutput();
+        var steps = new List<HostStep>();
         try
         {
             var config = ReadConfiguration();
@@ -32,18 +35,18 @@ internal static class Program
                 throw new InvalidOperationException("Extension origin does not match the installed configuration.");
             var request = await ReadMessage(Console.OpenStandardInput());
             if (request.Action is not ("check" or "install")) throw new InvalidOperationException("Unsupported updater action.");
-            var response = await RunUpdate(config, request.Action);
+            var response = await RunUpdate(config, request.Action, steps);
             await WriteMessage(output, response);
             return 0;
         }
         catch (Exception error)
         {
-            await WriteMessage(output, new HostResponse(false, "error", null, null, SafeError(error)));
+            await WriteMessage(output, new HostResponse(false, "error", null, null, SafeError(error), steps));
             return 1;
         }
     }
 
-    private static async Task<HostResponse> RunUpdate(HostConfiguration config, string action)
+    private static async Task<HostResponse> RunUpdate(HostConfiguration config, string action, List<HostStep> steps)
     {
         if (action == "install")
         {
@@ -53,38 +56,44 @@ internal static class Program
                 gate = new FileStream(Path.Combine(InstallDir, "installation.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
             }
             catch (IOException) { throw new InvalidOperationException("Uma atualização já está em andamento."); }
-            await using (gate) return await RunUpdateCore(config, action);
+            await using (gate) return await RunUpdateCore(config, action, steps);
         }
-        return await RunUpdateCore(config, action);
+        return await RunUpdateCore(config, action, steps);
     }
 
-    private static async Task<HostResponse> RunUpdateCore(HostConfiguration config, string action)
+    private static async Task<HostResponse> RunUpdateCore(HostConfiguration config, string action, List<HostStep> steps)
     {
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(45) };
         http.DefaultRequestHeaders.UserAgent.ParseAdd("CleaningLeadUpdater/1.0");
-        return await RunUpdateCore(config, action, http, ReadEmbeddedPublicKey());
+        return await RunUpdateCore(config, action, http, ReadEmbeddedPublicKey(), steps);
     }
 
     // Dependency injection is internal and used by the local integration test;
     // Native Messaging requests never supply an HTTP client or a trusted key.
-    internal static async Task<HostResponse> RunUpdateCore(HostConfiguration config, string action, HttpClient http, string publicKey)
+    internal static async Task<HostResponse> RunUpdateCore(HostConfiguration config, string action, HttpClient http, string publicKey, List<HostStep>? steps = null)
     {
-        var current = ReadExtensionVersion(config.ExtensionPath);
-        var manifestBytes = await Download(http, ManifestUrl, 16384);
-        var signatureBytes = await Download(http, SignatureUrl, 2048);
-        var signed = PackageVerifier.VerifyManifest(manifestBytes, signatureBytes, publicKey);
+        steps ??= new List<HostStep>();
+        T Measure<T>(string label, Func<T> run) { var watch = Stopwatch.StartNew(); var ok = false; try { var result = run(); ok = true; return result; } finally { steps.Add(new HostStep(label, watch.ElapsedMilliseconds, ok)); } }
+        async Task<T> MeasureAsync<T>(string label, Func<Task<T>> run) { var watch = Stopwatch.StartNew(); var ok = false; try { var result = await run(); ok = true; return result; } finally { steps.Add(new HostStep(label, watch.ElapsedMilliseconds, ok)); } }
+        var current = Measure("read_installed_version", () => ReadExtensionVersion(config.ExtensionPath));
+        // GitHub may cache release asset redirects after the assets are replaced.
+        // A fresh query parameter avoids receiving a stale signed channel.
+        var cacheKey = Guid.NewGuid().ToString("N");
+        var manifestBytes = await MeasureAsync("download_manifest", () => Download(http, $"{ManifestUrl}?check={cacheKey}", 16384));
+        var signatureBytes = await MeasureAsync("download_signature", () => Download(http, $"{SignatureUrl}?check={cacheKey}", 2048));
+        var signed = Measure("verify_manifest_signature", () => PackageVerifier.VerifyManifest(manifestBytes, signatureBytes, publicKey));
         if (!signed.PackageUrl.StartsWith(PackagePrefix, StringComparison.Ordinal) || signed.PackageUrl.Contains('?') || signed.PackageUrl.Contains('#'))
             throw new InvalidDataException("Signed package URL is not an official GitHub release URL.");
         if (CompareVersions(signed.Version, current) <= 0)
-            return new HostResponse(true, "up_to_date", current, signed.Version, "A extensão já está atualizada.");
+            return new HostResponse(true, "up_to_date", current, signed.Version, "A extensão já está atualizada.", steps);
         if (action == "check")
-            return new HostResponse(true, "available", current, signed.Version, "Nova versão assinada disponível.");
-        var package = await Download(http, signed.PackageUrl, 40 * 1024 * 1024);
+            return new HostResponse(true, "available", current, signed.Version, "Nova versão assinada disponível.", steps);
+        var package = await MeasureAsync("download_package", () => Download(http, signed.PackageUrl, 40 * 1024 * 1024));
         using var stream = new MemoryStream(package, writable: false);
-        PackageVerifier.VerifyPackage(stream, signed.Sha256);
+        Measure("verify_package_hash", () => { PackageVerifier.VerifyPackage(stream, signed.Sha256); return true; });
         stream.Position = 0;
-        PackageInstaller.Install(stream, config.ExtensionPath, signed.Version);
-        return new HostResponse(true, "installed", current, signed.Version, "Atualização instalada. Recarregue a página do Yelp.");
+        Measure("install_and_backup", () => { PackageInstaller.Install(stream, config.ExtensionPath, signed.Version); return true; });
+        return new HostResponse(true, "installed", current, signed.Version, "Atualização instalada. Recarregue a página do Yelp.", steps);
     }
 
     private static int CompareVersions(string left, string right)
@@ -156,8 +165,9 @@ internal static class Program
         {
             if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("Setup requires Windows.");
             _ = ReadEmbeddedPublicKey();
-            Console.Write("Pasta atual da extensão (chrome://extensions → detalhes → carregada de): ");
-            var path = Console.ReadLine()?.Trim().Trim('"') ?? "";
+            Console.WriteLine("Selecione na janela a pasta exibida em chrome://extensions → detalhes → Carregado de.");
+            var path = SelectExtensionFolder();
+            if (string.IsNullOrWhiteSpace(path)) throw new InvalidOperationException("Seleção cancelada; nenhuma configuração foi alterada.");
             Console.Write("ID da extensão (32 letras exibidas em chrome://extensions): ");
             var id = Console.ReadLine()?.Trim() ?? "";
             var config = new HostConfiguration(id, path);
@@ -194,6 +204,30 @@ internal static class Program
             return 0;
         }
         catch (Exception error) { Console.Error.WriteLine(SafeError(error)); return 1; }
+    }
+
+    private static string? SelectExtensionFolder()
+    {
+        string? selected = null;
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                var type = Type.GetTypeFromProgID("Shell.Application") ?? throw new InvalidOperationException("Seletor de pastas do Windows indisponível.");
+                dynamic shell = Activator.CreateInstance(type) ?? throw new InvalidOperationException("Seletor de pastas do Windows indisponível.");
+                // BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE: return a real
+                // filesystem directory and allow normal folder navigation.
+                dynamic? folder = shell.BrowseForFolder(0, "Selecione a pasta atual da extensão no Chrome", 0x0001 | 0x0040, 0);
+                if (folder is not null) selected = (string?)folder.Self.Path;
+            }
+            catch (Exception error) { failure = error; }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null) throw new InvalidOperationException("Não foi possível abrir o seletor de pastas do Windows.", failure);
+        return selected;
     }
 
     private static async Task<HostRequest> ReadMessage(Stream input)

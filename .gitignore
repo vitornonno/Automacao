@@ -24,6 +24,7 @@ node_modules/
 updater/**/bin/
 updater/**/obj/
 updater/dist/
+.cleaning-updater-backup-*/
 coverage/
 test-results/
 playwright-report/
