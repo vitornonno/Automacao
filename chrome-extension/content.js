@@ -2,7 +2,7 @@
 (function contentModule() {
   'use strict';
 
-  const BUILD_VERSION = '0.1.37';
+  const BUILD_VERSION = '0.1.38';
   let companyOverride = null;
   let discountPercent = '';
   let lead = null;
